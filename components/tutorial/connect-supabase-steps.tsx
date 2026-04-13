@@ -3,9 +3,9 @@ import { TutorialStep } from "./tutorial-step";
 export function ConnectSupabaseSteps() {
   return (
     <ol className="flex flex-col gap-6">
-      <TutorialStep title="Create Supabase project">
+      <TutorialStep title="Crea un proyecto en Supabase">
         <p>
-          Head over to{" "}
+          Ve a{" "}
           <a
             href="https://app.supabase.com/project/_/settings/api"
             target="_blank"
@@ -14,47 +14,47 @@ export function ConnectSupabaseSteps() {
           >
             database.new
           </a>{" "}
-          and create a new Supabase project.
+          y crea un proyecto nuevo.
         </p>
       </TutorialStep>
 
-      <TutorialStep title="Declare environment variables">
+      <TutorialStep title="Configura las variables de entorno">
         <p>
-          Rename the{" "}
-          <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+          Copia{" "}
+          <span className="tutorial-code">
             .env.example
           </span>{" "}
-          file in your Next.js app to{" "}
-          <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+          como{" "}
+          <span className="tutorial-code">
             .env.local
           </span>{" "}
-          and populate with values from{" "}
+          y rellénalo con los valores de{" "}
           <a
             href="https://app.supabase.com/project/_/settings/api"
             target="_blank"
             className="font-bold hover:underline text-foreground/80"
             rel="noreferrer"
           >
-            your Supabase project&apos;s API Settings
+            la API de tu proyecto Supabase
           </a>
           .
         </p>
       </TutorialStep>
 
-      <TutorialStep title="Restart your Next.js development server">
+      <TutorialStep title="Reinicia el servidor de desarrollo">
         <p>
-          You may need to quit your Next.js development server and run{" "}
-          <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+          Cierra el servidor de Next.js y vuelve a ejecutar{" "}
+          <span className="tutorial-code">
             npm run dev
           </span>{" "}
-          again to load the new environment variables.
+          para cargar las nuevas variables.
         </p>
       </TutorialStep>
 
-      <TutorialStep title="Refresh the page">
+      <TutorialStep title="Recarga la página">
         <p>
-          You may need to refresh the page for Next.js to load the new
-          environment variables.
+          A veces hace falta refrescar el navegador para que Next.js aplique los
+          cambios.
         </p>
       </TutorialStep>
     </ol>

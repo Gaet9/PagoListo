@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    --scanner-video: #000000;
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -31,6 +32,7 @@
     --radius: 0.5rem;
   }
   .dark {
+    --scanner-video: #000000;
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
@@ -63,6 +65,51 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1 {
+    @apply font-sans font-bold tracking-tight text-foreground text-heading-1;
+  }
+  h2 {
+    @apply font-sans font-bold tracking-tight text-foreground text-heading-2-sm;
+  }
+  @screen sm {
+    h2 {
+      @apply text-heading-2-lg;
+    }
+  }
+  h3 {
+    @apply font-sans font-semibold text-foreground text-h3;
+  }
+  h4 {
+    @apply font-sans font-semibold text-foreground text-h4;
+  }
+  h5 {
+    @apply font-sans font-semibold text-foreground text-h5;
+  }
+  h6 {
+    @apply font-sans font-semibold text-foreground text-h6 uppercase;
+  }
+}
+
+@layer components {
+  .app-hero-title {
+    @apply font-bold tracking-tight text-hero-sm sm:text-hero-md md:text-hero-lg text-balance max-w-3xl text-foreground;
+  }
+  .app-lead {
+    @apply text-muted-foreground text-lead-sm md:text-lead-md max-w-2xl text-pretty leading-relaxed;
+  }
+  .app-section-subtitle {
+    @apply text-muted-foreground text-sm sm:text-base max-w-xl mx-auto;
+  }
+  .marketing-tagline {
+    @apply text-marketing-tagline-sm lg:text-marketing-tagline-lg leading-tight mx-auto max-w-xl text-center text-foreground;
+  }
+  .hero-divider {
+    @apply w-full h-px my-8 bg-gradient-to-r from-transparent via-foreground/10 to-transparent;
+  }
+  .tutorial-code {
+    @apply relative rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-secondary-foreground border;
   }
 }
