@@ -1,0 +1,323 @@
+"use client";
+
+import { createClient } from "@/lib/supabase/client";
+import { listProductos } from "@/lib/queries/productos";
+import type { ProductoRow } from "@/lib/types/negocio";
+import { BarcodeScannerDialog } from "@/components/tienda/barcode-scanner-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { Camera, Minus, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+type Props = { negocioId: string };
+
+type CartItem = {
+  producto: ProductoRow;
+  qty: number;
+};
+
+function moneyARS(v: number) {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 2,
+  }).format(v);
+}
+
+function toNumber(v: string | number | null | undefined) {
+  const n = typeof v === "number" ? v : parseFloat(String(v ?? "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function CobrarTab({ negocioId }: Props) {
+  const [productos, setProductos] = useState<ProductoRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [query, setQuery] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "qr" | "transfer" | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: e } = await listProductos(supabase, negocioId);
+    setLoading(false);
+    if (e) {
+      setError(e.message);
+      return;
+    }
+    setProductos((data as ProductoRow[]) ?? []);
+  }, [negocioId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const out: ProductoRow[] = [];
+    for (const p of productos) {
+      const nombre = p.nombre.toLowerCase();
+      const bc = (p.barcode ?? "").toLowerCase();
+      if (nombre.includes(q) || bc.includes(q)) out.push(p);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, [productos, query]);
+
+  const addProducto = useCallback((p: ProductoRow, qty = 1) => {
+    setCart((prev) => {
+      const idx = prev.findIndex((it) => it.producto.id === p.id);
+      if (idx === -1) return [...prev, { producto: p, qty }];
+      const copy = prev.slice();
+      copy[idx] = { ...copy[idx], qty: copy[idx].qty + qty };
+      return copy;
+    });
+  }, []);
+
+  const addByBarcode = useCallback(
+    (barcode: string) => {
+      const code = barcode.trim();
+      const p = productos.find((x) => (x.barcode ?? "").trim() === code);
+      if (!p) {
+        toast.error("Producto no encontrado", { description: `Código: ${code}` });
+        return;
+      }
+      addProducto(p, 1);
+      toast.success("Producto añadido");
+    },
+    [addProducto, productos],
+  );
+
+  const subtotal = useMemo(() => {
+    return cart.reduce((acc, it) => acc + toNumber(it.producto.precio_venta) * it.qty, 0);
+  }, [cart]);
+
+  if (loading && productos.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground py-8">
+        <span className="text-sm">Cargando productos…</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {error ? (
+        <p className="text-sm text-destructive border border-destructive/30 rounded-md p-3">
+          {error}
+        </p>
+      ) : null}
+
+      <section className="rounded-lg border bg-card p-4 flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-medium">Cobrar</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Buscá por nombre o código de barras, o escaneá con la cámara.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="shrink-0"
+            onClick={() => setScannerOpen(true)}
+            aria-label="Escanear código de barras"
+          >
+            <Camera className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="relative">
+          <div className="flex gap-2">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Nombre o código de barras…"
+              autoComplete="off"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                const q = query.trim();
+                if (!q) return;
+                const exactBarcode = productos.find((p) => (p.barcode ?? "").trim() === q);
+                if (exactBarcode) {
+                  addProducto(exactBarcode, 1);
+                  toast.success("Producto añadido");
+                  setQuery("");
+                  return;
+                }
+                if (filtered[0]) {
+                  addProducto(filtered[0], 1);
+                  toast.success("Producto añadido");
+                  setQuery("");
+                  return;
+                }
+                toast.error("Producto no encontrado");
+              }}
+            >
+              Validar
+            </Button>
+          </div>
+
+          {filtered.length > 0 ? (
+            <div className="absolute z-10 mt-2 w-full rounded-md border bg-popover shadow">
+              {filtered.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center justify-between gap-3"
+                  onClick={() => {
+                    addProducto(p, 1);
+                    toast.success("Producto añadido");
+                    setQuery("");
+                  }}
+                >
+                  <span className="truncate">{p.nombre}</span>
+                  <span className="text-muted-foreground shrink-0">
+                    {moneyARS(toNumber(p.precio_venta))}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <BarcodeScannerDialog
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={addByBarcode}
+        closeOnDetected={false}
+      />
+
+      <section className="rounded-lg border overflow-hidden">
+        <div className="border-b bg-muted/50 px-4 py-2">
+          <h3 className="text-sm font-medium">Detalle</h3>
+        </div>
+
+        {cart.length === 0 ? (
+          <div className="p-6 text-center text-muted-foreground text-sm">
+            Todavía no agregaste productos.
+          </div>
+        ) : (
+          <div className="divide-y">
+            {cart.map((it) => {
+              const unit = toNumber(it.producto.precio_venta);
+              const total = unit * it.qty;
+              return (
+                <div key={it.producto.id} className="p-4 flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">{it.producto.nombre}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {moneyARS(unit)} c/u
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      className="h-8 w-8"
+                      onClick={() =>
+                        setCart((prev) =>
+                          prev
+                            .map((x) =>
+                              x.producto.id === it.producto.id
+                                ? { ...x, qty: Math.max(1, x.qty - 1) }
+                                : x,
+                            )
+                            .filter((x) => x.qty > 0),
+                        )
+                      }
+                      aria-label="Restar"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="w-8 text-center text-sm tabular-nums">{it.qty}</span>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      className="h-8 w-8"
+                      onClick={() =>
+                        setCart((prev) =>
+                          prev.map((x) =>
+                            x.producto.id === it.producto.id
+                              ? { ...x, qty: x.qty + 1 }
+                              : x,
+                          ),
+                        )
+                      }
+                      aria-label="Sumar"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-sm font-medium tabular-nums">{moneyARS(total)}</p>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={() =>
+                        setCart((prev) => prev.filter((x) => x.producto.id !== it.producto.id))
+                      }
+                      aria-label="Quitar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="border-t bg-card px-4 py-3 flex items-center justify-between">
+          <span className="text-sm font-medium">Total</span>
+          <span className="text-sm font-semibold tabular-nums">{moneyARS(subtotal)}</span>
+        </div>
+      </section>
+
+      <section className="rounded-lg border bg-card p-4 flex flex-col gap-3">
+        <h3 className="text-sm font-medium">Método de pago</h3>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant={paymentMethod === "cash" ? "default" : "outline"}
+            onClick={() => setPaymentMethod("cash")}
+          >
+            Efectivo
+          </Button>
+          <Button
+            type="button"
+            variant={paymentMethod === "qr" ? "default" : "outline"}
+            onClick={() => setPaymentMethod("qr")}
+          >
+            QR
+          </Button>
+          <Button
+            type="button"
+            variant={paymentMethod === "transfer" ? "default" : "outline"}
+            onClick={() => setPaymentMethod("transfer")}
+          >
+            Transferencia
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+

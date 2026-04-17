@@ -53,6 +53,15 @@ Consultas y tipos de dominio están en `lib/queries/` y `lib/types/negocio.ts` (
 - `npm run dev` — desarrollo
 - `npm run build` — compilación de producción
 - `npm run start` — servidor tras `build`
+- `npm test` — unit tests (deben pasar antes de validar cambios de UI)
+- `npm run test:e2e` — e2e (cuando aplique)
+
+## Tests (obligatorio)
+
+Antes de dar por **validado** un componente (nuevo, modificado o eliminado), los tests deben estar **100% OK**:
+
+- Unit: `npm test`
+- E2E (si aplica): `npm run test:e2e`
 
 ## Estructura relevante
 

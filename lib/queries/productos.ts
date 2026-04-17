@@ -14,8 +14,6 @@ export async function listProductos(
 export type InsertProductoInput = {
   negocio_id: string;
   nombre: string;
-  descripcion?: string | null;
-  sku?: string | null;
   barcode?: string | null;
   precio_compra?: number;
   precio_venta?: number;
@@ -32,8 +30,6 @@ export async function insertProducto(
     .insert({
       negocio_id: input.negocio_id,
       nombre: input.nombre.trim(),
-      descripcion: input.descripcion?.trim() || null,
-      sku: input.sku?.trim() || null,
       barcode: input.barcode?.trim() || null,
       precio_compra: input.precio_compra ?? 0,
       precio_venta: input.precio_venta ?? 0,
@@ -46,8 +42,6 @@ export async function insertProducto(
 
 export type UpdateProductoInput = Partial<{
   nombre: string;
-  descripcion: string | null;
-  sku: string | null;
   barcode: string | null;
   precio_compra: number;
   precio_venta: number;

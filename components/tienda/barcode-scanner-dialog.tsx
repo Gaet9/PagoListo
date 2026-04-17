@@ -7,29 +7,42 @@ import {
 } from "@zxing/browser";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   onDetected: (text: string) => void;
+  closeOnDetected?: boolean;
 };
 
-export function BarcodeScannerDialog({ open, onClose, onDetected }: Props) {
+export function BarcodeScannerDialog({
+  open,
+  onClose,
+  onDetected,
+  closeOnDetected = true,
+}: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const onDetectedRef = useRef(onDetected);
   const onCloseRef = useRef(onClose);
+  const closeOnDetectedRef = useRef(closeOnDetected);
+  const lastDetectedRef = useRef<{ text: string; atMs: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   onDetectedRef.current = onDetected;
   onCloseRef.current = onClose;
+  closeOnDetectedRef.current = closeOnDetected;
 
   useEffect(() => {
     if (!open) {
       setErr(null);
       return;
     }
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     const video = videoRef.current;
     if (!video) return;
@@ -44,11 +57,20 @@ export function BarcodeScannerDialog({ open, onClose, onDetected }: Props) {
       if (cancelled || !result?.getText()) return;
       const text = result.getText().trim();
       if (!text) return;
-      cancelled = true;
-      controls.stop();
-      controlsRef.current = null;
+
+      // Prevent repeated scans of the same code in a short window.
+      const now = Date.now();
+      const last = lastDetectedRef.current;
+      if (last && last.text === text && now - last.atMs < 1500) return;
+      lastDetectedRef.current = { text, atMs: now };
+
       onDetectedRef.current(text);
-      onCloseRef.current();
+      if (closeOnDetectedRef.current) {
+        cancelled = true;
+        controls.stop();
+        controlsRef.current = null;
+        onCloseRef.current();
+      }
     };
 
     const start = async () => {
@@ -85,12 +107,13 @@ export function BarcodeScannerDialog({ open, onClose, onDetected }: Props) {
       controlsRef.current?.stop();
       controlsRef.current = null;
       readerRef.current = null;
+      document.body.style.overflow = prevOverflow;
     };
   }, [open]);
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex flex-col bg-background p-4 pb-safe-bottom"
       role="dialog"
@@ -133,6 +156,7 @@ export function BarcodeScannerDialog({ open, onClose, onDetected }: Props) {
       <Button type="button" variant="secondary" className="mt-4" onClick={onClose}>
         Cancelar
       </Button>
-    </div>
+    </div>,
+    document.body,
   );
 }

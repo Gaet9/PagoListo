@@ -1,0 +1,21 @@
+---
+description: Estándares del proyecto Negocios (POS) y lectura obligatoria de AGENTS.md
+alwaysApply: true
+---
+
+# Negocios — reglas para el agente
+
+- Leer y usar como referencia principal el archivo **`AGENTS.md`** en la raíz de este proyecto (`with-supabase-app/`) antes de generar o modificar código.
+- Respetar la estructura y convenciones definidas en `AGENTS.md`. No producir código que las contradiga.
+- Si falta detalle en `AGENTS.md`, formular una **hipótesis coherente** con la arquitectura ya presente en el repositorio.
+- **Separación estricta de responsabilidades**:
+  - **UI**: `components/` (incluido `components/ui/`).
+  - **Lógica / utilidades**: `lib/` (p. ej. `lib/utils`, helpers sin acoplar a una sola pantalla).
+  - **Datos**: `lib/queries/` y, en su caso, rutas API de Next.js — no mezclar consultas pesadas dentro de componentes de presentación cuando pueda extraerse.
+- Código **modular, legible y mantenible**; componentes **reutilizables** cuando tenga sentido.
+- **Estilos**: sin hardcodear colores/tamaños sueltos en JSX; usar tokens de `tailwind.config.ts`, variables de `app/globals.css`, clases de componente definidas ahí, y el primitivo **`PageShell`** para bloques con variantes de fondo/padding.
+- **Tipografía**: respetar la jerarquía `h1`–`h6` definida en `globals.css`; para titulares especiales usar las clases documentadas (p. ej. `.app-hero-title`).
+- **TypeScript**: modo estricto; **no usar `any`** salvo justificación extrema y comentada.
+- Antes de dar por terminada una tarea, comprobar mentalmente la alineación con `AGENTS.md` y corregir desvíos.
+
+Estas reglas aplican a **toda** generación o edición de código en este workspace, sin excepción.

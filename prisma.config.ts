@@ -3,8 +3,8 @@
 import dotenv from "dotenv";
 import { defineConfig } from "prisma/config";
 
-dotenv.config();
-dotenv.config({ path: ".env.local", override: true });
+// Variables locales del repo (Next.js también carga `.env.local` en dev/build).
+dotenv.config({ path: ".env.local" });
 
 const dbUrl = process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"];
 

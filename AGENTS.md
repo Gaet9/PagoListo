@@ -22,19 +22,19 @@ No sustituye un fiscalizador AFIP ni un ERP completo; es una capa operativa clar
 
 ## Estructura de carpetas (resumen)
 
-| Ubicación | Responsabilidad |
-|-----------|-----------------|
-| `app/` | Rutas, layouts, páginas. Server Components cuando aplica. |
-| `app/globals.css` | Variables CSS del tema, capa `base` para `body` y **jerarquía `h1`–`h6`**, clases de componente (`.app-hero-title`, `.app-lead`, etc.). |
-| `app/protected/` | Zona autenticada; layout con navegación. |
-| `app/protected/tienda/` | **Mi tienda**: dashboard con pestañas Productos, Ventas, Movimientos. |
-| `app/auth/` | Login, registro, recuperación de contraseña, callbacks. |
-| `components/` | UI reutilizable, formularios, navegación (`site-nav`, `nav-shop-link`). |
-| `components/tienda/` | Tabs de tienda, formularios de negocio/producto, escáner de códigos. |
-| `components/ui/` | Primitivos shadcn + **`PageShell`** (contenedor/sección con variantes de superficie y espaciado). |
-| `lib/supabase/` | Cliente browser/server, middleware. |
-| `lib/queries/` | Acceso a datos por dominio (negocios, productos, ventas, …). |
-| `lib/types/` | Tipos compartidos del dominio (`negocio`, etc.). |
+| Ubicación               | Responsabilidad                                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`                  | Rutas, layouts, páginas. Server Components cuando aplica.                                                                               |
+| `app/globals.css`       | Variables CSS del tema, capa `base` para `body` y **jerarquía `h1`–`h6`**, clases de componente (`.app-hero-title`, `.app-lead`, etc.). |
+| `app/protected/`        | Zona autenticada; layout con navegación.                                                                                                |
+| `app/protected/tienda/` | **Mi tienda**: dashboard con pestañas Productos, Ventas, Movimientos.                                                                   |
+| `app/auth/`             | Login, registro, recuperación de contraseña, callbacks.                                                                                 |
+| `components/`           | UI reutilizable, formularios, navegación (`site-nav`, `nav-shop-link`).                                                                 |
+| `components/tienda/`    | Tabs de tienda, formularios de negocio/producto, escáner de códigos.                                                                    |
+| `components/ui/`        | Primitivos shadcn + **`PageShell`** (contenedor/sección con variantes de superficie y espaciado).                                       |
+| `lib/supabase/`         | Cliente browser/server, middleware.                                                                                                     |
+| `lib/queries/`          | Acceso a datos por dominio (negocios, productos, ventas, …).                                                                            |
+| `lib/types/`            | Tipos compartidos del dominio (`negocio`, etc.).                                                                                        |
 
 ### Separación de responsabilidades
 
@@ -67,10 +67,10 @@ Ejemplo:
 ```tsx
 import { PageShell } from "@/components/ui/page-shell";
 
-<PageShell as="section" surface="card" padding="md" rounded="lg" maxWidth="content">
-  <h2>Sección</h2>
-  <p className="text-muted-foreground">Contenido.</p>
-</PageShell>
+<PageShell as='section' surface='card' padding='md' rounded='lg' maxWidth='content'>
+    <h2>Sección</h2>
+    <p className='text-muted-foreground'>Contenido.</p>
+</PageShell>;
 ```
 
 ## Convenciones de código
@@ -78,8 +78,13 @@ import { PageShell } from "@/components/ui/page-shell";
 - **TypeScript estricto**: evitar `any`; tipar props y respuestas cuando sea posible.
 - **Componentes modulares**: extraer secciones repetidas; preferir composición.
 - **Idioma**: textos de interfaz en **español**.
+- **Tests obligatorios**: cualquier **creación, modificación o eliminación** de componentes en `components/` o `components/ui/` debe ir acompañada de la **creación/actualización** de sus tests correspondientes (unit en `test/unit/` y, cuando aplique, e2e en `test/e2e/`).
 - **README**: `README.md` en la raíz del app resume setup y rutas; este archivo amplía contexto para agentes.
 
 ## Si falta información
 
 Si algo no está descrito aquí, **inferir** de la arquitectura existente (mismos patrones que en `lib/queries/` y `components/tienda/`) y mantener coherencia con RLS y multi-negocio.
+
+## Cursor / agente
+
+Las reglas del editor viven en **`.cursor/rules/`** en la raíz de la app (misma carpeta que `package.json` y este `AGENTS.md`). Abre **`with-supabase-app`** como carpeta del proyecto en Cursor para que esas reglas apliquen.

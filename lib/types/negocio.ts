@@ -8,8 +8,6 @@ export type ProductoRow = {
   id: string;
   negocio_id: string;
   nombre: string;
-  descripcion: string | null;
-  sku: string | null;
   barcode: string | null;
   precio_compra: string | number | null;
   precio_venta: string | number | null;
