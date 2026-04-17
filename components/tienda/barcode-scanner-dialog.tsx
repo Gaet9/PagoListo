@@ -35,21 +35,27 @@ export function BarcodeScannerDialog({
   onCloseRef.current = onClose;
   closeOnDetectedRef.current = closeOnDetected;
 
+  // Lock background scroll reliably while open.
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) {
       setErr(null);
       return;
     }
-
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const video = videoRef.current;
-    if (!video) return;
+    lastDetectedRef.current = null;
 
     const reader = new BrowserMultiFormatReader();
     readerRef.current = reader;
     let cancelled = false;
+    const video = videoRef.current;
 
     const callback: Parameters<
       BrowserMultiFormatReader["decodeFromConstraints"]
@@ -75,6 +81,10 @@ export function BarcodeScannerDialog({
 
     const start = async () => {
       setErr(null);
+      if (!video) {
+        setErr("No se pudo iniciar el video. Probá cerrar y volver a abrir.");
+        return;
+      }
       try {
         try {
           controlsRef.current = await reader.decodeFromConstraints(
@@ -107,7 +117,6 @@ export function BarcodeScannerDialog({
       controlsRef.current?.stop();
       controlsRef.current = null;
       readerRef.current = null;
-      document.body.style.overflow = prevOverflow;
     };
   }, [open]);
 
