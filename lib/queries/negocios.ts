@@ -28,3 +28,8 @@ export async function insertNegocio(
     .select("id, nombre, localizacion")
     .single();
 }
+
+/** Elimina el negocio si RLS lo permite (dueño / políticas en Supabase). */
+export async function deleteNegocioById(client: SupabaseClient, negocioId: string) {
+  return client.from("negocios").delete().eq("id", negocioId);
+}

@@ -4,8 +4,8 @@ Aplicación web en español para gestionar un negocio pequeño: productos, consu
 
 ## Qué hace la app
 
-- **Autenticación**: inicio de sesión protegido; las rutas bajo `/protected` requieren usuario.
-- **Mi tienda** (`/protected/tienda`): panel principal tras entrar.
+- **Autenticación**: inicio de sesión protegido; las rutas dentro de `app/(protected)/` requieren usuario (sin prefijo `/protected`).
+- **Mi tienda** (`/tiendas`): panel principal tras entrar.
   - Si no tienes negocio, puedes crear el primero con nombre y localización.
   - Con uno o varios negocios, eliges el **negocio activo** y trabajas en pestañas:
     - **Productos**: alta, edición y baja de productos (nombre, descripción, SKU, código de barras, precios, stock, activo).
@@ -67,8 +67,8 @@ Antes de dar por **validado** un componente (nuevo, modificado o eliminado), los
 
 | Ruta / carpeta | Rol |
 |----------------|-----|
-| `app/protected/` | Layout y páginas que exigen sesión |
-| `app/protected/tienda/` | Dashboard «Mi tienda» |
+| `app/(protected)/` | Layout y páginas que exigen sesión (sin prefijo de URL) |
+| `app/(protected)/tiendas/` | Dashboard «Mi tienda» |
 | `components/tienda/` | Formularios, pestañas, escáner de códigos |
 | `lib/supabase/` | Cliente browser/server y middleware |
 | `lib/queries/` | Llamadas a Supabase por dominio |

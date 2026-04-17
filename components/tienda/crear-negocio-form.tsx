@@ -17,9 +17,23 @@ import { useState } from "react";
 
 type Props = {
   onCreated: (n: NegocioListItem) => void;
+  /** Título de la tarjeta (por defecto: primer negocio). */
+  title?: string;
+  /** Texto bajo el título. */
+  description?: string;
+  /** Etiqueta del botón de envío. */
+  submitLabel?: string;
+  /** Si se pasa, muestra «Cancelar» al lado del envío (p. ej. formulario desplegable). */
+  onCancel?: () => void;
 };
 
-export function CrearNegocioForm({ onCreated }: Props) {
+export function CrearNegocioForm({
+  onCreated,
+  title = "Crea tu negocio",
+  description = "Aún no tienes ningún negocio registrado. Añade uno para gestionar productos y ventas.",
+  submitLabel = "Crear negocio",
+  onCancel,
+}: Props) {
   const [nombre, setNombre] = useState("");
   const [localizacion, setLocalizacion] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -58,11 +72,8 @@ export function CrearNegocioForm({ onCreated }: Props) {
   return (
     <Card className="max-w-md">
       <CardHeader>
-        <CardTitle>Crea tu negocio</CardTitle>
-        <CardDescription>
-          Aún no tienes ningún negocio registrado. Añade uno para gestionar
-          productos y ventas.
-        </CardDescription>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
@@ -86,9 +97,16 @@ export function CrearNegocioForm({ onCreated }: Props) {
             />
           </div>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button type="submit" disabled={loading}>
-            {loading ? "Creando…" : "Crear negocio"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {onCancel ?
+              <Button type="button" variant="ghost" disabled={loading} onClick={onCancel}>
+                Cancelar
+              </Button>
+            : null}
+            <Button type="submit" disabled={loading}>
+              {loading ? "Creando…" : submitLabel}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

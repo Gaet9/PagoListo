@@ -1,8 +1,12 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { deleteProducto, insertProducto, listProductos, updateProducto } from "@/lib/queries/productos";
+import { insertCompraReposicion } from "@/lib/queries/compras";
+import { recordProductoStockMovement } from "@/lib/queries/movimientos-stock";
+import { deleteProducto, fetchProductosTotalsForNegocio, insertProducto, listProductosPage, updateProducto } from "@/lib/queries/productos";
 import type { ProductoRow } from "@/lib/types/negocio";
+import type { ProductosTotals } from "@/lib/queries/productos";
+import type { KeysetCursor } from "@/lib/types/pagination";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -39,6 +43,21 @@ function parseStock(s: string) {
     return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
+/** Vacío o inválido → null (campo obligatorio en alta). */
+function parseRequiredMoney(s: string): number | null {
+    const t = s.trim();
+    if (!t) return null;
+    const n = parseFloat(t.replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function parseRequiredStock(s: string): number | null {
+    const t = s.trim();
+    if (!t) return null;
+    const n = parseInt(t, 10);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 function sanitizeDecimalInput(raw: string) {
     // Allow digits and a single decimal separator ("," or ".").
     const only = raw.replace(/[^\d.,]/g, "");
@@ -63,6 +82,14 @@ function formatCreatedAtShort(iso: string) {
         month: "2-digit",
         year: "2-digit",
     }).format(new Date(iso));
+}
+
+function formatARS(n: number) {
+    return new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency: "ARS",
+        maximumFractionDigits: 2,
+    }).format(n);
 }
 
 function ProductoRowEditor({
@@ -90,6 +117,7 @@ function ProductoRowEditor({
     const [deleteOpen, setDeleteOpen] = useState(false);
     const saveTimerRef = useRef<number | null>(null);
     const lastSavedKeyRef = useRef<string>("");
+    const guardarInFlightRef = useRef(false);
 
     useEffect(() => {
         setNombre(row.nombre);
@@ -104,39 +132,95 @@ function ProductoRowEditor({
 
     const guardar = useCallback(
         async (opts?: { notifySuccess?: boolean }) => {
-        const patch = {
-            nombre: nombre.trim(),
-            barcode: barcode.trim() || null,
-            precio_compra: parseMoney(precioCompra),
-            precio_venta: parseMoney(precioVenta),
-            stock_actual: parseStock(stock),
+            const patch = {
+                nombre: nombre.trim(),
+                barcode: barcode.trim() || null,
+                precio_compra: parseMoney(precioCompra),
+                precio_venta: parseMoney(precioVenta),
+                stock_actual: parseStock(stock),
+                activo,
+            };
+
+            // Avoid pointless writes while user is still typing.
+            if (!patch.nombre) return false;
+
+            const key = JSON.stringify(patch);
+            if (key === lastSavedKeyRef.current) return true;
+            if (guardarInFlightRef.current) return false;
+
+            guardarInFlightRef.current = true;
+            setSaving(true);
+            setMsg(null);
+            try {
+                const supabase = createClient();
+                const prevStock = row.stock_actual;
+                const { error } = await updateProducto(supabase, row.id, patch);
+                if (error) {
+                    setMsg(error.message);
+                    toast.error("No se pudo guardar el producto", {
+                        description: error.message,
+                    });
+                    return false;
+                }
+                if (patch.stock_actual > prevStock) {
+                    const delta = patch.stock_actual - prevStock;
+                    const { error: compErr } = await insertCompraReposicion(
+                        supabase,
+                        row.negocio_id,
+                        [
+                            {
+                                producto_id: row.id,
+                                cantidad: delta,
+                                precio_unitario: patch.precio_compra,
+                            },
+                        ],
+                        { notas: "Reposición desde productos" },
+                    );
+                    if (compErr) {
+                        const desc =
+                            compErr instanceof Error ? compErr.message : String(compErr);
+                        toast.warning("Producto guardado, pero no se registró la compra / movimiento de stock", {
+                            description: desc,
+                        });
+                    }
+                } else if (patch.stock_actual < prevStock) {
+                    const { error: movErr } = await recordProductoStockMovement(
+                        supabase,
+                        row.id,
+                        prevStock,
+                        patch.stock_actual,
+                        {
+                            precioCompra: patch.precio_compra,
+                            precioVenta: patch.precio_venta,
+                        },
+                    );
+                    if (movErr) {
+                        toast.warning("Producto guardado, pero no se registró el movimiento de stock", {
+                            description: movErr.message,
+                        });
+                    }
+                }
+                lastSavedKeyRef.current = key;
+                if (opts?.notifySuccess) toast.success("Producto guardado");
+                onChanged();
+                return true;
+            } finally {
+                guardarInFlightRef.current = false;
+                setSaving(false);
+            }
+        },
+        [
             activo,
-        };
-
-        // Avoid pointless writes while user is still typing.
-        if (!patch.nombre) return false;
-
-        const key = JSON.stringify(patch);
-        if (key === lastSavedKeyRef.current) return true;
-
-        setSaving(true);
-        setMsg(null);
-        const supabase = createClient();
-        const { error } = await updateProducto(supabase, row.id, patch);
-        setSaving(false);
-        if (error) {
-            setMsg(error.message);
-            toast.error("No se pudo guardar el producto", {
-                description: error.message,
-            });
-            return false;
-        }
-        lastSavedKeyRef.current = key;
-        if (opts?.notifySuccess) toast.success("Producto guardado");
-        onChanged();
-        return true;
-    },
-        [activo, barcode, nombre, onChanged, precioCompra, precioVenta, row.id, stock],
+            barcode,
+            nombre,
+            onChanged,
+            precioCompra,
+            precioVenta,
+            row.id,
+            row.negocio_id,
+            row.stock_actual,
+            stock,
+        ],
     );
 
     useEffect(() => {
@@ -247,71 +331,72 @@ function ProductoRowEditor({
                                 <div className='grid gap-3'>
                                     <div className='grid gap-1'>
                                         <p className='text-xs text-muted-foreground'>Código de barras</p>
-                                        {isEditing ? (
+                                        {isEditing ?
                                             <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} className='h-9 text-sm' />
-                                        ) : (
-                                            <p className='text-sm'>{barcode || "—"}</p>
-                                        )}
+                                        :   <p className='text-sm'>{barcode || "—"}</p>}
                                     </div>
 
                                     <div className='grid grid-cols-3 gap-3'>
                                         <div className='grid gap-1'>
                                             <p className='text-xs text-muted-foreground'>Compra</p>
-                                            {isEditing ? (
-                                            <Input
-                                                value={precioCompra}
-                                                onChange={(e) => setPrecioCompra(sanitizeDecimalInput(e.target.value))}
-                                                className='h-9 text-sm'
-                                                inputMode='decimal'
-                                                pattern='[0-9.,]*'
-                                            />
-                                            ) : (
-                                                <p className='text-sm'>{precioCompra || "—"}</p>
-                                            )}
+                                            {isEditing ?
+                                                <Input
+                                                    value={precioCompra}
+                                                    onChange={(e) => setPrecioCompra(sanitizeDecimalInput(e.target.value))}
+                                                    className='h-9 text-sm'
+                                                    inputMode='decimal'
+                                                    pattern='[0-9.,]*'
+                                                />
+                                            :   <p className='text-sm'>{precioCompra || "—"}</p>}
                                         </div>
                                         <div className='grid gap-1'>
                                             <p className='text-xs text-muted-foreground'>Venta</p>
-                                            {isEditing ? (
-                                            <Input
-                                                value={precioVenta}
-                                                onChange={(e) => setPrecioVenta(sanitizeDecimalInput(e.target.value))}
-                                                className='h-9 text-sm'
-                                                inputMode='decimal'
-                                                pattern='[0-9.,]*'
-                                            />
-                                            ) : (
-                                                <p className='text-sm'>{precioVenta || "—"}</p>
-                                            )}
+                                            {isEditing ?
+                                                <Input
+                                                    value={precioVenta}
+                                                    onChange={(e) => setPrecioVenta(sanitizeDecimalInput(e.target.value))}
+                                                    className='h-9 text-sm'
+                                                    inputMode='decimal'
+                                                    pattern='[0-9.,]*'
+                                                />
+                                            :   <p className='text-sm'>{precioVenta || "—"}</p>}
                                         </div>
                                         <div className='grid gap-1'>
                                             <p className='text-xs text-muted-foreground'>Stock</p>
-                                            {isEditing ? (
-                                            <Input
-                                                value={stock}
-                                                onChange={(e) => setStock(sanitizeIntInput(e.target.value))}
-                                                className='h-9 text-sm'
-                                                inputMode='numeric'
-                                                pattern='[0-9]*'
-                                            />
-                                            ) : (
-                                                <p className='text-sm'>{stock || "0"}</p>
-                                            )}
+                                            {isEditing ?
+                                                <Input
+                                                    value={stock}
+                                                    onChange={(e) => setStock(sanitizeIntInput(e.target.value))}
+                                                    className='h-9 text-sm'
+                                                    inputMode='numeric'
+                                                    pattern='[0-9]*'
+                                                />
+                                            :   <p className='text-sm'>{stock || "0"}</p>}
                                         </div>
                                     </div>
 
                                     <div className='flex items-center justify-between gap-3'>
                                         <div className='flex items-center gap-2'>
-                                            <Checkbox checked={activo} onCheckedChange={(v) => setActivo(v === true)} id={`act-m-${row.id}`} disabled={!isEditing} />
+                                            <Checkbox
+                                                checked={activo}
+                                                onCheckedChange={(v) => setActivo(v === true)}
+                                                id={`act-m-${row.id}`}
+                                                disabled={!isEditing}
+                                            />
                                             <Label htmlFor={`act-m-${row.id}`} className='text-sm font-normal'>
                                                 Activo
                                             </Label>
                                         </div>
-                                        <p className='text-sm text-muted-foreground whitespace-nowrap'>{formatCreatedAtShort(row.created_at)}</p>
+                                        <p className='text-sm text-muted-foreground whitespace-nowrap'>
+                                            {formatCreatedAtShort(row.created_at)}
+                                        </p>
                                     </div>
 
                                     <div className='flex items-center justify-end gap-2'>{actions}</div>
 
-                                    {msg ? <p className='text-caption text-destructive mt-1'>{msg}</p> : null}
+                                    {msg ?
+                                        <p className='text-caption text-destructive mt-1'>{msg}</p>
+                                    :   null}
                                 </div>
                             </AccordionContent>
                         </AccordionItem>
@@ -384,51 +469,153 @@ function ProductoRowEditor({
 
 type Props = { negocioId: string };
 
+const PAGE_SIZE = 10;
+
 export function ProductosTab({ negocioId }: Props) {
     const [rows, setRows] = useState<ProductoRow[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [totals, setTotals] = useState<ProductosTotals | null>(null);
+    const [totalsError, setTotalsError] = useState<string | null>(null);
+    const [nextCursor, setNextCursor] = useState<KeysetCursor | null>(null);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingInitial, setLoadingInitial] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [searchInput, setSearchInput] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
 
     const [editingRowId, setEditingRowId] = useState<string | null>(null);
     const [addAccordionValue, setAddAccordionValue] = useState<string>("");
     const [nNombre, setNNombre] = useState("");
     const [nBarcode, setNBarcode] = useState("");
-    const [nPc, setNPc] = useState("0");
-    const [nPv, setNPv] = useState("0");
-    const [nStock, setNStock] = useState("0");
+    const [nPc, setNPc] = useState("");
+    const [nPv, setNPv] = useState("");
+    const [nStock, setNStock] = useState("");
     const [nActivo, setNActivo] = useState(true);
     const [adding, setAdding] = useState(false);
     const [scannerOpen, setScannerOpen] = useState(false);
 
-    const load = useCallback(async () => {
-        setLoading(true);
+    useEffect(() => {
+        const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 300);
+        return () => window.clearTimeout(t);
+    }, [searchInput]);
+
+    const loadFirstPage = useCallback(async () => {
+        setLoadingInitial(true);
+        setError(null);
+        setHasMore(true);
+        setNextCursor(null);
+        const supabase = createClient();
+        const search = debouncedSearch || undefined;
+        const [pageRes, totalsRes] = await Promise.all([
+            listProductosPage(supabase, negocioId, {
+                limit: PAGE_SIZE,
+                cursor: null,
+                search,
+            }),
+            fetchProductosTotalsForNegocio(supabase, negocioId, { search }),
+        ]);
+        setLoadingInitial(false);
+
+        const { data, error: e } = pageRes;
+        if (e) {
+            setError(e.message);
+            setRows([]);
+            setTotals(null);
+            setTotalsError(null);
+            return;
+        }
+
+        if (totalsRes.error) {
+            setTotals(null);
+            setTotalsError(totalsRes.error.message);
+        } else {
+            setTotals(totalsRes.data);
+            setTotalsError(null);
+        }
+
+        const list = (data as ProductoRow[]) ?? [];
+        const more = list.length > PAGE_SIZE;
+        const slice = more ? list.slice(0, PAGE_SIZE) : list;
+        setRows(slice);
+        setHasMore(more);
+        if (more && slice.length > 0) {
+            const last = slice[slice.length - 1]!;
+            setNextCursor({ created_at: last.created_at, id: last.id });
+        } else {
+            setNextCursor(null);
+        }
+    }, [debouncedSearch, negocioId]);
+
+    const loadMore = useCallback(async () => {
+        if (!hasMore || loadingMore || !nextCursor) return;
+        setLoadingMore(true);
         setError(null);
         const supabase = createClient();
-        const { data, error: e } = await listProductos(supabase, negocioId);
-        setLoading(false);
+        const { data, error: e } = await listProductosPage(supabase, negocioId, {
+            limit: PAGE_SIZE,
+            cursor: nextCursor,
+            search: debouncedSearch || undefined,
+        });
+        setLoadingMore(false);
         if (e) {
             setError(e.message);
             return;
         }
-        setRows((data as ProductoRow[]) ?? []);
-    }, [negocioId]);
+        const list = (data as ProductoRow[]) ?? [];
+        const more = list.length > PAGE_SIZE;
+        const slice = more ? list.slice(0, PAGE_SIZE) : list;
+        setRows((prev) => [...prev, ...slice]);
+        setHasMore(more);
+        if (more && slice.length > 0) {
+            const last = slice[slice.length - 1]!;
+            setNextCursor({ created_at: last.created_at, id: last.id });
+        } else {
+            setNextCursor(null);
+        }
+    }, [debouncedSearch, hasMore, loadingMore, negocioId, nextCursor]);
 
     useEffect(() => {
-        load();
-    }, [load]);
+        void loadFirstPage();
+    }, [loadFirstPage]);
+
+    useEffect(() => {
+        const el = sentinelRef.current;
+        if (!el) return;
+        const obs = new IntersectionObserver(
+            (entries) => {
+                const hit = entries.some((e) => e.isIntersecting);
+                if (hit) void loadMore();
+            },
+            { root: null, rootMargin: "120px", threshold: 0 },
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
+    }, [loadMore]);
 
     const add = async (e: React.FormEvent) => {
         e.preventDefault();
         setAdding(true);
         setError(null);
         const supabase = createClient();
-        const { error: insErr } = await insertProducto(supabase, {
+        const precioCompra = parseRequiredMoney(nPc);
+        const precioVenta = parseRequiredMoney(nPv);
+        const stockInicial = parseRequiredStock(nStock);
+        if (precioCompra === null || precioVenta === null || stockInicial === null) {
+            setAdding(false);
+            const msg =
+                "Completá precio de compra, precio de venta y stock con números válidos (cada uno mayor o igual a 0).";
+            setError(msg);
+            toast.error("Faltan datos del producto", { description: msg });
+            return;
+        }
+        const { data: insertado, error: insErr } = await insertProducto(supabase, {
             negocio_id: negocioId,
             nombre: nNombre,
             barcode: nBarcode || null,
-            precio_compra: parseMoney(nPc),
-            precio_venta: parseMoney(nPv),
-            stock_actual: parseStock(nStock),
+            precio_compra: precioCompra,
+            precio_venta: precioVenta,
+            stock_actual: stockInicial,
             activo: nActivo,
         });
         setAdding(false);
@@ -439,18 +626,38 @@ export function ProductosTab({ negocioId }: Props) {
             });
             return;
         }
+        if (insertado?.id && stockInicial > 0) {
+            const { error: compErr } = await insertCompraReposicion(
+                supabase,
+                negocioId,
+                [
+                    {
+                        producto_id: insertado.id,
+                        cantidad: stockInicial,
+                        precio_unitario: precioCompra,
+                    },
+                ],
+                { notas: "Stock inicial (alta de producto)" },
+            );
+            if (compErr) {
+                const desc = compErr instanceof Error ? compErr.message : String(compErr);
+                toast.warning("Producto añadido, pero no se registró la compra / movimiento de stock", {
+                    description: desc,
+                });
+            }
+        }
         setNNombre("");
         setNBarcode("");
-        setNPc("0");
-        setNPv("0");
-        setNStock("0");
+        setNPc("");
+        setNPv("");
+        setNStock("");
         setNActivo(true);
         setAddAccordionValue("");
         toast.success("Producto añadido");
-        load();
+        void loadFirstPage();
     };
 
-    if (loading && rows.length === 0) {
+    if (loadingInitial && rows.length === 0) {
         return (
             <div className='flex items-center gap-2 text-muted-foreground py-8'>
                 <Loader2 className='h-5 w-5 animate-spin' />
@@ -464,6 +671,11 @@ export function ProductosTab({ negocioId }: Props) {
             {error ?
                 <p className='text-sm text-destructive border border-destructive/30 rounded-md p-3'>{error}</p>
             :   null}
+
+            <div>
+                <h2 id='productos-tab-heading'>Productos</h2>
+                <p className='mt-1 text-sm text-muted-foreground'>El catálogo de tu negocio.</p>
+            </div>
 
             <div className='rounded-lg border bg-card'>
                 <Accordion type='single' collapsible value={addAccordionValue} onValueChange={setAddAccordionValue}>
@@ -487,33 +699,39 @@ export function ProductosTab({ negocioId }: Props) {
                                         <Input id='np-bar' value={nBarcode} onChange={(e) => setNBarcode(e.target.value)} />
                                     </div>
                                     <div className='grid gap-1'>
-                                        <Label htmlFor='np-pc'>Precio compra</Label>
+                                        <Label htmlFor='np-pc'>Precio compra *</Label>
                                         <Input
                                             id='np-pc'
                                             value={nPc}
                                             onChange={(e) => setNPc(sanitizeDecimalInput(e.target.value))}
                                             inputMode='decimal'
                                             pattern='[0-9.,]*'
+                                            required
+                                            placeholder='0'
                                         />
                                     </div>
                                     <div className='grid gap-1'>
-                                        <Label htmlFor='np-pv'>Precio venta</Label>
+                                        <Label htmlFor='np-pv'>Precio venta *</Label>
                                         <Input
                                             id='np-pv'
                                             value={nPv}
                                             onChange={(e) => setNPv(sanitizeDecimalInput(e.target.value))}
                                             inputMode='decimal'
                                             pattern='[0-9.,]*'
+                                            required
+                                            placeholder='0'
                                         />
                                     </div>
                                     <div className='grid gap-1'>
-                                        <Label htmlFor='np-st'>Stock</Label>
+                                        <Label htmlFor='np-st'>Stock *</Label>
                                         <Input
                                             id='np-st'
                                             value={nStock}
                                             onChange={(e) => setNStock(sanitizeIntInput(e.target.value))}
                                             inputMode='numeric'
                                             pattern='[0-9]*'
+                                            required
+                                            placeholder='0'
                                         />
                                     </div>
                                     <div className='flex items-end gap-2 pb-2'>
@@ -534,7 +752,7 @@ export function ProductosTab({ negocioId }: Props) {
                                         type='button'
                                         variant='outline'
                                         size='icon'
-                                        className='md:hidden shrink-0'
+                                        className='shrink-0'
                                         onClick={() => setScannerOpen(true)}
                                         aria-label='Escanear código de barras'>
                                         <Camera className='h-4 w-4' />
@@ -548,69 +766,134 @@ export function ProductosTab({ negocioId }: Props) {
 
             <BarcodeScannerDialog open={scannerOpen} onClose={() => setScannerOpen(false)} onDetected={(text) => setNBarcode(text)} />
 
+            <div className='grid gap-2'>
+                <Label htmlFor='productos-buscar'>Buscar productos</Label>
+                <Input
+                    id='productos-buscar'
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder='Nombre o código de barras…'
+                    autoComplete='off'
+                />
+            </div>
+
             <h2 className='text-sm font-medium lg:hidden'>Lista de productos</h2>
 
-            <div className='rounded-lg border overflow-hidden'>
-                <table className='w-full table-fixed text-sm'>
-                    <colgroup>
-                        <col className='w-4/12' />
-                        <col className='w-2/12' />
-                        <col className='w-1/12' />
-                        <col className='w-1/12' />
-                        <col className='w-1/12' />
-                        <col className='w-1/12' />
-                        <col className='w-1/12' />
-                        <col className='w-1/12' />
-                    </colgroup>
-                    <thead className='hidden md:table-header-group'>
-                        <tr className='border-b bg-muted/50 text-left'>
-                            <th scope='col' className='p-2 font-medium'>
-                                Nombre
-                            </th>
-                            <th scope='col' className='p-2 font-medium'>
-                                Código barras
-                            </th>
-                            <th scope='col' className='p-2 font-medium'>
-                                P. compra
-                            </th>
-                            <th scope='col' className='p-2 font-medium'>
-                                P. venta
-                            </th>
-                            <th scope='col' className='p-2 font-medium'>
-                                Stock
-                            </th>
-                            <th scope='col' className='p-2 font-medium'>
-                                Activo
-                            </th>
-                            <th scope='col' className='p-2 font-medium'>
-                                Creado
-                            </th>
-                            <th scope='col' className='p-2 font-medium text-right'>
-                                Acciones
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows.length === 0 ?
-                            <tr>
-                                <td colSpan={8} className='p-6 text-center text-muted-foreground'>
-                                    No hay productos. Usa el formulario de arriba para añadir el primero.
-                                </td>
+            <div className='rounded-lg border overflow-hidden flex flex-col max-h-[min(65vh,32rem)] bg-card'>
+                <div className='overflow-x-auto overflow-y-auto min-h-0 flex-1'>
+                    <table className='w-full table-fixed text-sm'>
+                        <colgroup>
+                            <col className='w-4/12' />
+                            <col className='w-2/12' />
+                            <col className='w-1/12' />
+                            <col className='w-1/12' />
+                            <col className='w-1/12' />
+                            <col className='w-1/12' />
+                            <col className='w-1/12' />
+                            <col className='w-1/12' />
+                        </colgroup>
+                        <thead className='hidden md:table-header-group sticky top-0 z-10 bg-muted/95 backdrop-blur-sm border-b'>
+                            <tr className='text-left'>
+                                <th scope='col' className='p-2 font-medium'>
+                                    Nombre
+                                </th>
+                                <th scope='col' className='p-2 font-medium'>
+                                    Código barras
+                                </th>
+                                <th scope='col' className='p-2 font-medium'>
+                                    P. compra
+                                </th>
+                                <th scope='col' className='p-2 font-medium'>
+                                    P. venta
+                                </th>
+                                <th scope='col' className='p-2 font-medium'>
+                                    Stock
+                                </th>
+                                <th scope='col' className='p-2 font-medium'>
+                                    Activo
+                                </th>
+                                <th scope='col' className='p-2 font-medium'>
+                                    Creado
+                                </th>
+                                <th scope='col' className='p-2 font-medium text-right'>
+                                    Acciones
+                                </th>
                             </tr>
-                        :   rows.map((row) => (
-                                <ProductoRowEditor
-                                    key={row.id}
-                                    row={row}
-                                    onChanged={load}
-                                    isEditing={editingRowId === row.id}
-                                    onStartEdit={() => setEditingRowId(row.id)}
-                                    onDoneEdit={() => setEditingRowId(null)}
-                                />
-                            ))
-                        }
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {rows.length === 0 ?
+                                <tr>
+                                    <td colSpan={8} className='p-6 text-center text-muted-foreground'>
+                                        No hay productos. Usa el formulario de arriba para añadir el primero.
+                                    </td>
+                                </tr>
+                            :   rows.map((row) => (
+                                    <ProductoRowEditor
+                                        key={row.id}
+                                        row={row}
+                                        onChanged={loadFirstPage}
+                                        isEditing={editingRowId === row.id}
+                                        onStartEdit={() => setEditingRowId(row.id)}
+                                        onDoneEdit={() => setEditingRowId(null)}
+                                    />
+                                ))
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div role='region' aria-label='Totales de productos' className='shrink-0 border-t bg-muted/50'>
+                    {totalsError ?
+                        <p className='px-3 py-2 text-xs text-destructive'>{totalsError}</p>
+                    : totals ?
+                        <div className='px-3 py-2.5'>
+                            <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4'>
+                                <div className='flex items-center gap-2 min-w-0'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-muted-foreground'>
+                                        Totales
+                                        {debouncedSearch ?
+                                            <span className='ml-1 font-normal normal-case'>(según búsqueda)</span>
+                                        :   null}
+                                    </p>
+                                    {loadingInitial && rows.length > 0 ?
+                                        <Loader2
+                                            className='h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0'
+                                            aria-label='Actualizando totales'
+                                        />
+                                    :   null}
+                                </div>
+                                <dl className='grid grid-cols-2 gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-6 sm:gap-y-1 text-xs tabular-nums'>
+                                    <div>
+                                        <dt className='text-muted-foreground'>Productos</dt>
+                                        <dd className='font-medium text-foreground'>{totals.lineCount}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className='text-muted-foreground'>Stock</dt>
+                                        <dd className='font-medium text-foreground'>{totals.stockTotal}</dd>
+                                    </div>
+                                    <div className='col-span-2 sm:col-span-1'>
+                                        <dt className='text-muted-foreground'>Total compra</dt>
+                                        <dd className='font-medium text-foreground'>{formatARS(totals.sumPrecioCompra)}</dd>
+                                    </div>
+                                    <div className='col-span-2 sm:col-span-1'>
+                                        <dt className='text-muted-foreground'>Total venta</dt>
+                                        <dd className='font-medium text-foreground'>{formatARS(totals.sumPrecioVenta)}</dd>
+                                    </div>
+                                </dl>
+                            </div>
+                        </div>
+                    :   <div className='px-3 py-2 text-xs text-muted-foreground'>—</div>}
+                </div>
             </div>
+
+            <div ref={sentinelRef} className='h-1 w-full' aria-hidden />
+
+            {loadingMore ?
+                <div className='flex justify-center py-2 text-muted-foreground text-sm gap-2'>
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                    Cargando más…
+                </div>
+            :   null}
         </div>
     );
 }

@@ -26,12 +26,44 @@ export type VentaRow = {
   created_at: string;
 };
 
+export type VentaItemRow = {
+  id: string;
+  venta_id: string;
+  producto_id: string;
+  cantidad: number;
+  precio_unitario: string | number;
+  subtotal: string | number | null;
+  // Supabase nested select may return an object or 1-element array depending on relationship inference.
+  productos: { nombre: string } | { nombre: string }[] | null;
+};
+
+export type CompraItemRow = {
+  id: string;
+  compra_id: string;
+  producto_id: string;
+  cantidad: number;
+  precio_unitario: string | number;
+  subtotal: string | number | null;
+  productos: { nombre: string } | { nombre: string }[] | null;
+};
+
+export type VentaConItemsRow = VentaRow & {
+  venta_items: VentaItemRow[] | null;
+};
+
 export type MovimientoStockRow = {
   id: string;
   producto_id: string;
   tipo: string;
   cantidad: number;
-  motivo: string;
   created_at: string;
+  /** Precio unitario de referencia (compra o venta según el movimiento). */
+  precio_unitario?: string | number | null;
+  venta_id?: string | null;
+  compra_id?: string | null;
+  stock_anterior?: number | null;
+  stock_nuevo?: number | null;
+  venta_item_id?: string | null;
+  compra_item_id?: string | null;
   productos: { nombre: string } | null;
 };

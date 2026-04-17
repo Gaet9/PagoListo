@@ -3,30 +3,41 @@
 import type { NegocioListItem } from "@/lib/types/negocio";
 import { CrearNegocioForm } from "./crear-negocio-form";
 import { CobrarTab } from "./cobrar-tab";
+import { ComprasTab } from "./compras-tab";
 import { MovimientosTab } from "./movimientos-tab";
 import { ProductosTab } from "./productos-tab";
 import { VentasTab } from "./ventas-tab";
 import { useMemo, useState } from "react";
+import type { LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Banknote, Package, Receipt, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type TabId = "cobrar" | "productos" | "ventas" | "movimientos";
+type TabId = "cobrar" | "compras" | "productos" | "ventas" | "movimientos";
 
-const tabs: { id: TabId; label: string }[] = [
-    { id: "cobrar", label: "Cobrar" },
-    { id: "productos", label: "Productos" },
-    { id: "ventas", label: "Ventas" },
-    { id: "movimientos", label: "Movimientos de stock" },
+const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
+    { id: "cobrar", label: "Cobrar", icon: Banknote },
+    { id: "compras", label: "Compras", icon: ShoppingCart },
+    { id: "productos", label: "Productos", icon: Package },
+    { id: "ventas", label: "Ventas", icon: Receipt },
+    { id: "movimientos", label: "Movimientos de stock", icon: ArrowLeftRight },
 ];
 
 type Props = {
     initialNegocios: NegocioListItem[];
+    /** Si viene de `/tiendas/[slug]`, fija el negocio activo al resolver el slug. */
+    initialNegocioId?: string;
 };
 
-export function TiendaDashboard({ initialNegocios }: Props) {
+export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
     const [negocios, setNegocios] = useState<NegocioListItem[]>(initialNegocios);
     const [tab, setTab] = useState<TabId>("productos");
 
-    const [negocioId, setNegocioId] = useState(() => initialNegocios[0]?.id ?? "");
+    const [negocioId, setNegocioId] = useState(() => {
+        if (initialNegocioId && initialNegocios.some((n) => n.id === initialNegocioId)) {
+            return initialNegocioId;
+        }
+        return initialNegocios[0]?.id ?? "";
+    });
 
     const currentNegocioId = useMemo(() => {
         if (!negocios.some((n) => n.id === negocioId) && negocios[0]) {
@@ -34,6 +45,8 @@ export function TiendaDashboard({ initialNegocios }: Props) {
         }
         return negocioId;
     }, [negocios, negocioId]);
+
+    const activeNegocio = useMemo(() => negocios.find((n) => n.id === currentNegocioId) ?? negocios[0], [negocios, currentNegocioId]);
 
     if (negocios.length === 0) {
         return (
@@ -56,17 +69,16 @@ export function TiendaDashboard({ initialNegocios }: Props) {
         <div className='flex flex-col gap-6 w-full'>
             <div className='flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4'>
                 <div>
-                    <h1>Mi tienda</h1>
-                    <p className='text-muted-foreground text-sm mt-1'>Datos de tu negocio: tablas enlazadas a Supabase con RLS.</p>
+                    <h1>{activeNegocio?.nombre ?? "Mi tienda"}</h1>
                 </div>
                 {negocios.length > 1 ?
-                    <div className='flex flex-col gap-1 min-w-negocio-select'>
+                    <div className='flex flex-col gap-1 min-w-0 w-full sm:w-auto sm:min-w-negocio-select'>
                         <label htmlFor='negocio-select' className='text-xs font-medium text-muted-foreground'>
                             Negocio activo
                         </label>
                         <select
                             id='negocio-select'
-                            className='h-9 rounded-md border border-input bg-background px-3 text-sm'
+                            className='h-9 w-full rounded-md border border-input bg-background px-3 text-sm'
                             value={currentNegocioId}
                             onChange={(e) => setNegocioId(e.target.value)}>
                             {negocios.map((n) => (
@@ -79,26 +91,37 @@ export function TiendaDashboard({ initialNegocios }: Props) {
                 :   null}
             </div>
 
-            <div className='flex flex-wrap gap-1 border-b'>
-                {tabs.map((t) => (
-                    <button
-                        key={t.id}
-                        type='button'
-                        onClick={() => setTab(t.id)}
-                        className={cn(
-                            "px-4 py-2 text-sm font-medium rounded-t-md border-b-2 -mb-px transition-colors",
-                            tab === t.id ?
-                                "border-primary text-foreground"
-                            :   "border-transparent text-muted-foreground hover:text-foreground",
-                        )}>
-                        {t.label}
-                    </button>
-                ))}
+            <div className='flex w-full min-w-0 flex-nowrap gap-1 border-b'>
+                {tabs.map((t) => {
+                    const Icon = t.icon;
+                    return (
+                        <button
+                            key={t.id}
+                            type='button'
+                            onClick={() => setTab(t.id)}
+                            aria-label={t.label}
+                            title={t.label}
+                            aria-current={tab === t.id ? "page" : undefined}
+                            className={cn(
+                                "flex min-w-0 flex-1 items-center justify-center gap-2 rounded-t-md border-b-2 px-2 py-2 text-sm font-medium transition-colors sm:px-4 sm:py-2",
+                                "-mb-px",
+                                tab === t.id ?
+                                    "border-primary text-foreground"
+                                :   "border-transparent text-muted-foreground hover:text-foreground",
+                            )}>
+                            <Icon className='h-4 w-4 shrink-0 opacity-90' aria-hidden />
+                            <span className='hidden truncate sm:inline'>{t.label}</span>
+                        </button>
+                    );
+                })}
             </div>
 
             <div className='min-h-dashboard-tab'>
                 {tab === "cobrar" ?
                     <CobrarTab negocioId={currentNegocioId} />
+                :   null}
+                {tab === "compras" ?
+                    <ComprasTab negocioId={currentNegocioId} />
                 :   null}
                 {tab === "productos" ?
                     <ProductosTab negocioId={currentNegocioId} />

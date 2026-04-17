@@ -1,5 +1,6 @@
 "use client";
 
+import { validateNewPasswordStrength } from "@/lib/auth/password-policy";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,7 @@ export function SignUpForm({
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/protected`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/perfil`,
         },
       });
       if (error) throw error;
@@ -58,12 +59,19 @@ export function SignUpForm({
       return;
     }
 
+    const pwdErr = validateNewPasswordStrength(password);
+    if (pwdErr) {
+      setError(pwdErr);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/protected`,
+          emailRedirectTo: `${window.location.origin}/perfil`,
         },
       });
       if (error) throw error;

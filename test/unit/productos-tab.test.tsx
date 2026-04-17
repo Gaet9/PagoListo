@@ -4,17 +4,37 @@ import userEvent from "@testing-library/user-event";
 
 import { ProductosTab } from "@/components/tienda/productos-tab";
 
+const { recordProductoStockMovementMock } = vi.hoisted(() => ({
+  recordProductoStockMovementMock: vi.fn().mockResolvedValue({ error: null }),
+}));
+
+const { insertCompraReposicionMock } = vi.hoisted(() => ({
+  insertCompraReposicionMock: vi.fn().mockResolvedValue({ data: { compraId: "c1" }, error: null }),
+}));
+
+vi.mock("@/lib/queries/compras", () => ({
+  insertCompraReposicion: (...args: unknown[]) => insertCompraReposicionMock(...args),
+}));
+
+vi.mock("@/lib/queries/movimientos-stock", () => ({
+  recordProductoStockMovement: (...args: unknown[]) =>
+    recordProductoStockMovementMock(...args),
+}));
+
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({}),
 }));
 
-const listProductosMock = vi.fn();
+const listProductosPageMock = vi.fn();
+const fetchProductosTotalsForNegocioMock = vi.fn();
 const insertProductoMock = vi.fn();
 const updateProductoMock = vi.fn();
 const deleteProductoMock = vi.fn();
 
 vi.mock("@/lib/queries/productos", () => ({
-  listProductos: (...args: unknown[]) => listProductosMock(...args),
+  listProductosPage: (...args: unknown[]) => listProductosPageMock(...args),
+  fetchProductosTotalsForNegocio: (...args: unknown[]) =>
+    fetchProductosTotalsForNegocioMock(...args),
   insertProducto: (...args: unknown[]) => insertProductoMock(...args),
   updateProducto: (...args: unknown[]) => updateProductoMock(...args),
   deleteProducto: (...args: unknown[]) => deleteProductoMock(...args),
@@ -22,10 +42,12 @@ vi.mock("@/lib/queries/productos", () => ({
 
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
+const toastWarning = vi.fn();
 vi.mock("sonner", () => ({
   toast: {
     success: (...args: unknown[]) => toastSuccess(...args),
     error: (...args: unknown[]) => toastError(...args),
+    warning: (...args: unknown[]) => toastWarning(...args),
   },
 }));
 
@@ -36,20 +58,34 @@ vi.mock("@/components/tienda/barcode-scanner-dialog", () => ({
 
 describe("ProductosTab", () => {
   beforeEach(() => {
-    listProductosMock.mockReset();
+    listProductosPageMock.mockReset();
+    fetchProductosTotalsForNegocioMock.mockReset();
     insertProductoMock.mockReset();
     updateProductoMock.mockReset();
     deleteProductoMock.mockReset();
     toastSuccess.mockReset();
     toastError.mockReset();
+    toastWarning.mockReset();
+    recordProductoStockMovementMock.mockReset();
+    recordProductoStockMovementMock.mockResolvedValue({ error: null });
+    insertCompraReposicionMock.mockReset();
+    insertCompraReposicionMock.mockResolvedValue({ data: { compraId: "c1" }, error: null });
+    fetchProductosTotalsForNegocioMock.mockResolvedValue({
+      data: {
+        lineCount: 0,
+        stockTotal: 0,
+        sumPrecioCompra: 0,
+        sumPrecioVenta: 0,
+      },
+      error: null,
+    });
   });
 
   it("adds a product and shows success toast", async () => {
     const user = userEvent.setup();
 
-    listProductosMock.mockResolvedValueOnce({ data: [], error: null });
+    listProductosPageMock.mockResolvedValue({ data: [], error: null });
     insertProductoMock.mockResolvedValue({ data: { id: "p1" }, error: null });
-    listProductosMock.mockResolvedValueOnce({ data: [], error: null });
 
     render(<ProductosTab negocioId="n1" />);
 
@@ -59,7 +95,15 @@ describe("ProductosTab", () => {
     // Accordion trigger and submit share label; pick the trigger (first occurrence).
     const addButtons = screen.getAllByRole("button", { name: "Añadir producto" });
     await user.click(addButtons[0]!);
+
+    expect(
+      screen.getByRole("button", { name: "Escanear código de barras" }),
+    ).toBeInTheDocument();
+
     await user.type(screen.getByLabelText("Nombre *"), "Yerba");
+    await user.type(screen.getByLabelText("Precio compra *"), "10");
+    await user.type(screen.getByLabelText("Precio venta *"), "15");
+    await user.type(screen.getByLabelText("Stock *"), "5");
     const submit = screen
       .getAllByRole("button", { name: "Añadir producto" })
       .find((b) => b.getAttribute("type") === "submit");
@@ -67,12 +111,13 @@ describe("ProductosTab", () => {
     await user.click(submit!);
 
     expect(toastSuccess).toHaveBeenCalledWith("Producto añadido");
+    expect(insertCompraReposicionMock).toHaveBeenCalled();
   });
 
   it("edits a product and shows success toast when clicking Listo", async () => {
     const user = userEvent.setup();
 
-    listProductosMock.mockResolvedValue({
+    listProductosPageMock.mockResolvedValue({
       data: [
         {
           id: "p1",
@@ -88,9 +133,27 @@ describe("ProductosTab", () => {
       ],
       error: null,
     });
+    fetchProductosTotalsForNegocioMock.mockResolvedValue({
+      data: {
+        lineCount: 1,
+        stockTotal: 3,
+        sumPrecioCompra: 10,
+        sumPrecioVenta: 20,
+      },
+      error: null,
+    });
     updateProductoMock.mockResolvedValue({ data: { id: "p1" }, error: null });
 
     render(<ProductosTab negocioId="n1" />);
+
+    const totalsRegion = await screen.findByRole("region", {
+      name: "Totales de productos",
+    });
+    expect(totalsRegion).toHaveTextContent("Productos");
+    expect(totalsRegion).toHaveTextContent("Stock");
+    expect(totalsRegion).toHaveTextContent("3");
+    expect(totalsRegion).toHaveTextContent("Total compra");
+    expect(totalsRegion).toHaveTextContent("Total venta");
 
     // Open mobile row accordion (we can't rely on viewport, so click trigger by name)
     await user.click(await screen.findByRole("button", { name: "Agua" }));

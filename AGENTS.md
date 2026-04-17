@@ -26,8 +26,8 @@ No sustituye un fiscalizador AFIP ni un ERP completo; es una capa operativa clar
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `app/`                  | Rutas, layouts, páginas. Server Components cuando aplica.                                                                               |
 | `app/globals.css`       | Variables CSS del tema, capa `base` para `body` y **jerarquía `h1`–`h6`**, clases de componente (`.app-hero-title`, `.app-lead`, etc.). |
-| `app/protected/`        | Zona autenticada; layout con navegación.                                                                                                |
-| `app/protected/tienda/` | **Mi tienda**: dashboard con pestañas Productos, Ventas, Movimientos.                                                                   |
+| `app/(protected)/`      | Zona autenticada; layout con navegación (sin prefijo de URL).                                                                           |
+| `app/(protected)/tiendas/` | **Mi tienda**: dashboard con pestañas Productos, Ventas, Movimientos.                                                                |
 | `app/auth/`             | Login, registro, recuperación de contraseña, callbacks.                                                                                 |
 | `components/`           | UI reutilizable, formularios, navegación (`site-nav`, `nav-shop-link`).                                                                 |
 | `components/tienda/`    | Tabs de tienda, formularios de negocio/producto, escáner de códigos.                                                                    |

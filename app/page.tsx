@@ -1,10 +1,14 @@
 import { HomeGuestCTAs } from "@/components/home-guest-ctas";
+import { HomeFaq } from "@/components/home-faq";
 import { HomeHowItWorks } from "@/components/home-how-it-works";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
+import { buildFaqPageJsonLd, faqItemsHome } from "@/lib/content/faq-negocios";
 import { hasEnvVars } from "@/lib/utils";
 import Image from "next/image";
 import { Suspense } from "react";
+
+const homeFaqJsonLd = buildFaqPageJsonLd(faqItemsHome);
 
 export default function Home() {
     return (
@@ -42,7 +46,15 @@ export default function Home() {
                     </section>
 
                     <HomeHowItWorks />
+
+                    <HomeFaq items={faqItemsHome} accordionValuePrefix='home' />
                 </div>
+
+                <script
+                    type='application/ld+json'
+                    // eslint-disable-next-line react/no-danger -- JSON-LD para SEO (FAQPage)
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(homeFaqJsonLd) }}
+                />
 
                 <SiteFooter />
             </div>

@@ -25,15 +25,18 @@ export async function AuthButton() {
 
         if (perfil) {
             const row = perfil as { nombre: string | null; apellido: string | null };
-            nombreCompleto = [row.nombre, row.apellido].filter(Boolean).join(" ");
+            nombreCompleto = row.nombre;
         }
     }
 
     return user ?
             <div className='flex items-center gap-4'>
-                <span className="text-muted-foreground truncate max-w-auth-greet">
+                <Link
+                    href='/perfil'
+                    className='text-muted-foreground truncate max-w-auth-greet rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+                    aria-label='Ir a mi perfil'>
                     Hola, {displayNameFromClaims(user, nombreCompleto)}
-                </span>
+                </Link>
                 <LogoutButton />
             </div>
         :   <div className='flex gap-2'>
