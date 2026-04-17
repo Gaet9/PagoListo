@@ -16,6 +16,14 @@ type Props = {
   closeOnDetected?: boolean;
 };
 
+const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
+  facingMode: { ideal: "environment" },
+  // iOS Safari can behave oddly with unconstrained streams; give it hints.
+  width: { ideal: 1280 },
+  height: { ideal: 720 },
+  aspectRatio: { ideal: 16 / 9 },
+};
+
 export function BarcodeScannerDialog({
   open,
   onClose,
@@ -88,7 +96,7 @@ export function BarcodeScannerDialog({
       try {
         try {
           controlsRef.current = await reader.decodeFromConstraints(
-            { video: { facingMode: "environment" } },
+            { video: VIDEO_CONSTRAINTS },
             video,
             callback,
           );
@@ -98,6 +106,13 @@ export function BarcodeScannerDialog({
             video,
             callback,
           );
+        }
+
+        // iOS Safari sometimes needs an explicit play() to render correctly.
+        try {
+          await video.play();
+        } catch {
+          // ignore
         }
       } catch (e) {
         if (!cancelled) {
@@ -151,6 +166,9 @@ export function BarcodeScannerDialog({
           className="absolute inset-0 h-full w-full object-cover"
           muted
           playsInline
+          autoPlay
+          disablePictureInPicture
+          controls={false}
         />
       </div>
 
