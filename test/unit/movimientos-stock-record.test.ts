@@ -47,6 +47,7 @@ describe("recordProductoStockMovement", () => {
             expect.objectContaining({
                 producto_id: "p1",
                 tipo: "out",
+                motivo: "ajuste",
                 cantidad: 7,
                 stock_anterior: 10,
                 stock_nuevo: 3,

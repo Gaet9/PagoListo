@@ -154,14 +154,6 @@ function ProductoRowEditor({
             try {
                 const supabase = createClient();
                 const prevStock = row.stock_actual;
-                const { error } = await updateProducto(supabase, row.id, patch);
-                if (error) {
-                    setMsg(error.message);
-                    toast.error("No se pudo guardar el producto", {
-                        description: error.message,
-                    });
-                    return false;
-                }
                 if (patch.stock_actual > prevStock) {
                     const delta = patch.stock_actual - prevStock;
                     const { error: compErr } = await insertCompraReposicion(
@@ -174,26 +166,29 @@ function ProductoRowEditor({
                                 precio_unitario: patch.precio_compra,
                             },
                         ],
-                        { notas: "Reposición desde productos" },
+                        { notas: "Compra (desde ficha producto)" },
                     );
                     if (compErr) {
-                        const desc =
-                            compErr instanceof Error ? compErr.message : String(compErr);
-                        toast.warning("Producto guardado, pero no se registró la compra / movimiento de stock", {
-                            description: desc,
-                        });
+                        const desc = compErr instanceof Error ? compErr.message : String(compErr);
+                        setMsg(desc);
+                        toast.error("No se pudo registrar la compra de stock", { description: desc });
+                        return false;
                     }
-                } else if (patch.stock_actual < prevStock) {
-                    const { error: movErr } = await recordProductoStockMovement(
-                        supabase,
-                        row.id,
-                        prevStock,
-                        patch.stock_actual,
-                        {
-                            precioCompra: patch.precio_compra,
-                            precioVenta: patch.precio_venta,
-                        },
-                    );
+                }
+
+                const { error } = await updateProducto(supabase, row.id, patch);
+                if (error) {
+                    setMsg(error.message);
+                    toast.error("No se pudo guardar el producto", {
+                        description: error.message,
+                    });
+                    return false;
+                }
+                if (patch.stock_actual < prevStock) {
+                    const { error: movErr } = await recordProductoStockMovement(supabase, row.id, prevStock, patch.stock_actual, {
+                        precioCompra: patch.precio_compra,
+                        precioVenta: patch.precio_venta,
+                    });
                     if (movErr) {
                         toast.warning("Producto guardado, pero no se registró el movimiento de stock", {
                             description: movErr.message,
@@ -209,18 +204,7 @@ function ProductoRowEditor({
                 setSaving(false);
             }
         },
-        [
-            activo,
-            barcode,
-            nombre,
-            onChanged,
-            precioCompra,
-            precioVenta,
-            row.id,
-            row.negocio_id,
-            row.stock_actual,
-            stock,
-        ],
+        [activo, barcode, nombre, onChanged, precioCompra, precioVenta, row.id, row.negocio_id, row.stock_actual, stock],
     );
 
     useEffect(() => {
@@ -333,7 +317,7 @@ function ProductoRowEditor({
                                         <p className='text-xs text-muted-foreground'>Código de barras</p>
                                         {isEditing ?
                                             <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} className='h-9 text-sm' />
-                                        :   <p className='text-sm'>{barcode || "—"}</p>}
+                                        :   <p className='text-sm'>{barcode || "-"}</p>}
                                     </div>
 
                                     <div className='grid grid-cols-3 gap-3'>
@@ -347,7 +331,7 @@ function ProductoRowEditor({
                                                     inputMode='decimal'
                                                     pattern='[0-9.,]*'
                                                 />
-                                            :   <p className='text-sm'>{precioCompra || "—"}</p>}
+                                            :   <p className='text-sm'>{precioCompra || "-"}</p>}
                                         </div>
                                         <div className='grid gap-1'>
                                             <p className='text-xs text-muted-foreground'>Venta</p>
@@ -359,7 +343,7 @@ function ProductoRowEditor({
                                                     inputMode='decimal'
                                                     pattern='[0-9.,]*'
                                                 />
-                                            :   <p className='text-sm'>{precioVenta || "—"}</p>}
+                                            :   <p className='text-sm'>{precioVenta || "-"}</p>}
                                         </div>
                                         <div className='grid gap-1'>
                                             <p className='text-xs text-muted-foreground'>Stock</p>
@@ -603,8 +587,7 @@ export function ProductosTab({ negocioId }: Props) {
         const stockInicial = parseRequiredStock(nStock);
         if (precioCompra === null || precioVenta === null || stockInicial === null) {
             setAdding(false);
-            const msg =
-                "Completá precio de compra, precio de venta y stock con números válidos (cada uno mayor o igual a 0).";
+            const msg = "Completá precio de compra, precio de venta y stock con números válidos (cada uno mayor o igual a 0).";
             setError(msg);
             toast.error("Faltan datos del producto", { description: msg });
             return;
@@ -615,7 +598,7 @@ export function ProductosTab({ negocioId }: Props) {
             barcode: nBarcode || null,
             precio_compra: precioCompra,
             precio_venta: precioVenta,
-            stock_actual: stockInicial,
+            stock_actual: 0,
             activo: nActivo,
         });
         setAdding(false);
@@ -637,7 +620,7 @@ export function ProductosTab({ negocioId }: Props) {
                         precio_unitario: precioCompra,
                     },
                 ],
-                { notas: "Stock inicial (alta de producto)" },
+                { notas: "Compra (stock inicial al crear producto)" },
             );
             if (compErr) {
                 const desc = compErr instanceof Error ? compErr.message : String(compErr);
@@ -862,27 +845,31 @@ export function ProductosTab({ negocioId }: Props) {
                                         />
                                     :   null}
                                 </div>
-                                <dl className='grid grid-cols-2 gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-6 sm:gap-y-1 text-xs tabular-nums'>
-                                    <div>
+                                <dl className='flex min-w-0 w-full flex-nowrap items-baseline gap-x-4 gap-y-0 overflow-x-auto text-xs tabular-nums sm:flex-wrap sm:gap-x-6 sm:gap-y-1'>
+                                    <div className='shrink-0'>
                                         <dt className='text-muted-foreground'>Productos</dt>
                                         <dd className='font-medium text-foreground'>{totals.lineCount}</dd>
                                     </div>
-                                    <div>
+                                    <div className='shrink-0'>
                                         <dt className='text-muted-foreground'>Stock</dt>
                                         <dd className='font-medium text-foreground'>{totals.stockTotal}</dd>
                                     </div>
-                                    <div className='col-span-2 sm:col-span-1'>
+                                    <div className='shrink-0'>
                                         <dt className='text-muted-foreground'>Total compra</dt>
-                                        <dd className='font-medium text-foreground'>{formatARS(totals.sumPrecioCompra)}</dd>
+                                        <dd className='font-medium text-foreground whitespace-nowrap'>
+                                            {formatARS(totals.sumPrecioCompra)}
+                                        </dd>
                                     </div>
-                                    <div className='col-span-2 sm:col-span-1'>
+                                    <div className='shrink-0'>
                                         <dt className='text-muted-foreground'>Total venta</dt>
-                                        <dd className='font-medium text-foreground'>{formatARS(totals.sumPrecioVenta)}</dd>
+                                        <dd className='font-medium text-foreground whitespace-nowrap'>
+                                            {formatARS(totals.sumPrecioVenta)}
+                                        </dd>
                                     </div>
                                 </dl>
                             </div>
                         </div>
-                    :   <div className='px-3 py-2 text-xs text-muted-foreground'>—</div>}
+                    :   <div className='px-3 py-2 text-xs text-muted-foreground'>-</div>}
                 </div>
             </div>
 

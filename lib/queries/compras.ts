@@ -77,7 +77,7 @@ export type InsertCompraReposicionOpts = {
 
 /**
  * Inserta una compra (cabecera + líneas). Cada `compra_item` dispara en BD
- * la escritura en `movimientos_stock` (entrada / reposición).
+ * la escritura en `movimientos_stock` (entrada por compra).
  */
 export async function insertCompraReposicion(
   client: SupabaseClient,
@@ -109,7 +109,7 @@ export async function insertCompraReposicion(
     .insert({
       negocio_id: negocioId,
       usuario_id: opts?.usuario_id ?? null,
-      notas: opts?.notas ?? "Reposición de stock",
+      notas: opts?.notas ?? "Compra",
       total,
       proveedor_nombre: opts?.proveedor_nombre?.trim() || null,
       proveedor_ref: opts?.proveedor_ref?.trim() || null,

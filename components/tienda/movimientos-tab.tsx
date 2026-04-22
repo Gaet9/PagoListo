@@ -23,7 +23,7 @@ function nombreProducto(m: MovimientoStockRow) {
     if (Array.isArray(p) && p[0] && typeof p[0] === "object" && "nombre" in p[0]) {
         return String((p[0] as { nombre: string }).nombre);
     }
-    return "—";
+    return "-";
 }
 
 function formatFecha(iso: string) {
@@ -49,15 +49,27 @@ function formatARS(n: number) {
 
 function refOperacion(m: MovimientoStockRow) {
     const id = m.venta_id ?? m.compra_id;
-    if (!id) return "—";
+    if (!id) return "-";
     return id.length > 10 ? `${id.slice(0, 10)}…` : id;
 }
 
 function stockEvolucion(m: MovimientoStockRow) {
     if (m.stock_anterior == null && m.stock_nuevo == null) {
-        return "—";
+        return "-";
     }
-    return `${m.stock_anterior ?? "—"} → ${m.stock_nuevo ?? "—"}`;
+    return `${m.stock_anterior ?? "-"} → ${m.stock_nuevo ?? "-"}`;
+}
+
+/** Evita filas repetidas (p. ej. cursor / infinite scroll o peticiones solapadas). */
+function dedupeMovimientosRows(rows: MovimientoStockRow[]): MovimientoStockRow[] {
+    const seen = new Set<string>();
+    const out: MovimientoStockRow[] = [];
+    for (const r of rows) {
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+        out.push(r);
+    }
+    return out;
 }
 
 /** `true` desde `md` (768px): tabla con cabecera; `false`: filas en acordeón. */
@@ -86,6 +98,7 @@ export function MovimientosTab({ negocioId }: Props) {
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const sentinelRef = useRef<HTMLDivElement | null>(null);
+    const loadMoreInFlightRef = useRef(false);
 
     const [productoFiltroId, setProductoFiltroId] = useState<string | null>(null);
     const [searchInput, setSearchInput] = useState("");
@@ -123,6 +136,7 @@ export function MovimientosTab({ negocioId }: Props) {
     );
 
     const loadFirstPage = useCallback(async () => {
+        loadMoreInFlightRef.current = false;
         setLoadingInitial(true);
         setError(null);
         setHasMore(true);
@@ -143,7 +157,7 @@ export function MovimientosTab({ negocioId }: Props) {
         const list = (data as MovimientoStockRow[]) ?? [];
         const more = list.length > pageSize;
         const slice = more ? list.slice(0, pageSize) : list;
-        setRows(slice);
+        setRows(dedupeMovimientosRows(slice));
         setHasMore(more);
         if (more && slice.length > 0) {
             const last = slice[slice.length - 1]!;
@@ -154,31 +168,36 @@ export function MovimientosTab({ negocioId }: Props) {
     }, [negocioId, pageSize, listOpts]);
 
     const loadMore = useCallback(async () => {
-        if (!hasMore || loadingMore || !nextCursor) return;
+        if (!hasMore || loadingMore || !nextCursor || loadMoreInFlightRef.current) return;
+        loadMoreInFlightRef.current = true;
         setLoadingMore(true);
         setError(null);
-        const supabase = createClient();
-        const extra = listOpts();
-        const { data, error: e } = await listMovimientosStockPage(supabase, negocioId, {
-            limit: pageSize,
-            cursor: nextCursor,
-            ...extra,
-        });
-        setLoadingMore(false);
-        if (e) {
-            setError(e.message);
-            return;
-        }
-        const list = (data as MovimientoStockRow[]) ?? [];
-        const more = list.length > pageSize;
-        const slice = more ? list.slice(0, pageSize) : list;
-        setRows((prev) => [...prev, ...slice]);
-        setHasMore(more);
-        if (more && slice.length > 0) {
-            const last = slice[slice.length - 1]!;
-            setNextCursor({ created_at: last.created_at, id: last.id });
-        } else {
-            setNextCursor(null);
+        try {
+            const supabase = createClient();
+            const extra = listOpts();
+            const { data, error: e } = await listMovimientosStockPage(supabase, negocioId, {
+                limit: pageSize,
+                cursor: nextCursor,
+                ...extra,
+            });
+            if (e) {
+                setError(e.message);
+                return;
+            }
+            const list = (data as MovimientoStockRow[]) ?? [];
+            const more = list.length > pageSize;
+            const slice = more ? list.slice(0, pageSize) : list;
+            setRows((prev) => dedupeMovimientosRows([...prev, ...slice]));
+            setHasMore(more);
+            if (more && slice.length > 0) {
+                const last = slice[slice.length - 1]!;
+                setNextCursor({ created_at: last.created_at, id: last.id });
+            } else {
+                setNextCursor(null);
+            }
+        } finally {
+            loadMoreInFlightRef.current = false;
+            setLoadingMore(false);
         }
     }, [hasMore, loadingMore, negocioId, nextCursor, pageSize, listOpts]);
 
@@ -207,8 +226,7 @@ export function MovimientosTab({ negocioId }: Props) {
 
     const isMdUp = useViewportIsMdUp();
 
-    const canResetTableSearch =
-        searchInput.trim().length > 0 || searchDebounced.length > 0;
+    const canResetTableSearch = searchInput.trim().length > 0 || searchDebounced.length > 0;
 
     const resetTableSearch = useCallback(() => {
         setSearchInput("");
@@ -308,7 +326,7 @@ export function MovimientosTab({ negocioId }: Props) {
                                         <td className='p-3 whitespace-nowrap'>{operacionMovimientoStock(m)}</td>
                                         <td className='p-3 max-w-[9rem] truncate text-muted-foreground text-xs'>{refOperacion(m)}</td>
                                         <td className='p-3 text-right tabular-nums whitespace-nowrap'>
-                                            {pNum != null ? formatARS(pNum) : "—"}
+                                            {pNum != null ? formatARS(pNum) : "-"}
                                         </td>
                                         <td className='p-3 text-right tabular-nums'>{m.cantidad}</td>
                                         <td className='p-3 tabular-nums text-xs whitespace-nowrap'>{stockEvolucion(m)}</td>
@@ -347,7 +365,7 @@ export function MovimientosTab({ negocioId }: Props) {
                                                 </div>
                                                 <div className='flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1'>
                                                     <dt className='shrink-0 text-muted-foreground'>P. unit.</dt>
-                                                    <dd className='tabular-nums text-foreground'>{pNum != null ? formatARS(pNum) : "—"}</dd>
+                                                    <dd className='tabular-nums text-foreground'>{pNum != null ? formatARS(pNum) : "-"}</dd>
                                                 </div>
                                                 <div className='flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1'>
                                                     <dt className='shrink-0 text-muted-foreground'>Cantidad</dt>

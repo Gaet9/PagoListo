@@ -11,6 +11,7 @@ import { TiendaDashboard } from "@/components/tienda/tienda-dashboard";
 import { listNegocios } from "@/lib/queries/negocios";
 import { resolveNegocioFromSlug } from "@/lib/negocio-slug";
 import type { NegocioListItem } from "@/lib/types/negocio";
+import { requirePaidUser } from "@/lib/auth/require-paid-user";
 import { createClient } from "@/lib/supabase/server";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -24,10 +25,7 @@ type PageProps = {
 async function TiendaSlugContent({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getClaims();
-  if (!auth?.claims) {
-    redirect("/auth/login");
-  }
+  await requirePaidUser(supabase);
 
   const { data: negociosRaw, error } = await listNegocios(supabase);
   if (error) {

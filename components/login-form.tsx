@@ -13,8 +13,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import { getSafeInternalNextPath } from "@/lib/auth/safe-next-path";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function LoginForm({
   className,
@@ -24,7 +25,13 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [afterLoginPath, setAfterLoginPath] = useState("/perfil");
   const router = useRouter();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setAfterLoginPath(getSafeInternalNextPath(params.get("next")));
+  }, []);
 
   const handleGoogleOAuth = async () => {
     const supabase = createClient();
@@ -32,15 +39,21 @@ export function LoginForm({
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const next = encodeURIComponent(afterLoginPath);
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/perfil`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${next}`,
         },
       });
       if (error) throw error;
+      if (data?.url) {
+        window.location.assign(data.url);
+        return;
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Ocurrió un error");
+    } finally {
       setIsLoading(false);
     }
   };
@@ -57,7 +70,7 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-      router.push("/perfil");
+      router.push(afterLoginPath);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Ocurrió un error");
     } finally {

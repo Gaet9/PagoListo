@@ -4,15 +4,16 @@ import type { NegocioListItem } from "@/lib/types/negocio";
 import { CrearNegocioForm } from "./crear-negocio-form";
 import { CobrarTab } from "./cobrar-tab";
 import { ComprasTab } from "./compras-tab";
+import { ConfiguracionTab } from "./configuracion-tab";
 import { MovimientosTab } from "./movimientos-tab";
 import { ProductosTab } from "./productos-tab";
 import { VentasTab } from "./ventas-tab";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeftRight, Banknote, Package, Receipt, ShoppingCart } from "lucide-react";
+import { ArrowLeftRight, Banknote, Package, Receipt, Settings, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type TabId = "cobrar" | "compras" | "productos" | "ventas" | "movimientos";
+type TabId = "cobrar" | "compras" | "productos" | "ventas" | "movimientos" | "configuracion";
 
 const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
     { id: "cobrar", label: "Cobrar", icon: Banknote },
@@ -20,6 +21,7 @@ const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
     { id: "productos", label: "Productos", icon: Package },
     { id: "ventas", label: "Ventas", icon: Receipt },
     { id: "movimientos", label: "Movimientos de stock", icon: ArrowLeftRight },
+    { id: "configuracion", label: "Configuración", icon: Settings },
 ];
 
 type Props = {
@@ -31,6 +33,8 @@ type Props = {
 export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
     const [negocios, setNegocios] = useState<NegocioListItem[]>(initialNegocios);
     const [tab, setTab] = useState<TabId>("productos");
+    /** Evita desmontar pestañas ya visitadas: al volver no se pierde estado ni se muestra de nuevo el cargador completo. */
+    const [mountedTabs, setMountedTabs] = useState<ReadonlySet<TabId>>(() => new Set<TabId>(["productos"]));
 
     const [negocioId, setNegocioId] = useState(() => {
         if (initialNegocioId && initialNegocios.some((n) => n.id === initialNegocioId)) {
@@ -47,6 +51,20 @@ export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
     }, [negocios, negocioId]);
 
     const activeNegocio = useMemo(() => negocios.find((n) => n.id === currentNegocioId) ?? negocios[0], [negocios, currentNegocioId]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const params = new URLSearchParams(window.location.search);
+        const raw = params.get("tab")?.trim().toLowerCase();
+        if (!raw) return;
+
+        const allowed: TabId[] = ["cobrar", "compras", "productos", "ventas", "movimientos", "configuracion"];
+        const next = allowed.includes(raw as TabId) ? (raw as TabId) : null;
+        if (!next) return;
+
+        setTab(next);
+        setMountedTabs((prev) => new Set(prev).add(next));
+    }, []);
 
     if (negocios.length === 0) {
         return (
@@ -91,14 +109,22 @@ export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
                 :   null}
             </div>
 
-            <div className='flex w-full min-w-0 flex-nowrap gap-1 border-b'>
+            <div
+                className={cn(
+                    "flex w-full min-w-0 flex-nowrap gap-1 border-b",
+                    "max-sm:sticky max-sm:top-0 max-sm:z-20 max-sm:-mx-1 max-sm:px-1 max-sm:pt-1 max-sm:pb-0.5",
+                    "max-sm:bg-background/95 max-sm:backdrop-blur-sm supports-[backdrop-filter]:max-sm:bg-background/80",
+                )}>
                 {tabs.map((t) => {
                     const Icon = t.icon;
                     return (
                         <button
                             key={t.id}
                             type='button'
-                            onClick={() => setTab(t.id)}
+                            onClick={() => {
+                                setTab(t.id);
+                                setMountedTabs((prev) => new Set(prev).add(t.id));
+                            }}
                             aria-label={t.label}
                             title={t.label}
                             aria-current={tab === t.id ? "page" : undefined}
@@ -117,20 +143,35 @@ export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
             </div>
 
             <div className='min-h-dashboard-tab'>
-                {tab === "cobrar" ?
-                    <CobrarTab negocioId={currentNegocioId} />
+                {mountedTabs.has("cobrar") ?
+                    <div key='panel-cobrar' hidden={tab !== "cobrar"}>
+                        <CobrarTab negocioId={currentNegocioId} />
+                    </div>
                 :   null}
-                {tab === "compras" ?
-                    <ComprasTab negocioId={currentNegocioId} />
+                {mountedTabs.has("compras") ?
+                    <div key='panel-compras' hidden={tab !== "compras"}>
+                        <ComprasTab negocioId={currentNegocioId} />
+                    </div>
                 :   null}
-                {tab === "productos" ?
-                    <ProductosTab negocioId={currentNegocioId} />
+                {mountedTabs.has("productos") ?
+                    <div key='panel-productos' hidden={tab !== "productos"}>
+                        <ProductosTab negocioId={currentNegocioId} />
+                    </div>
                 :   null}
-                {tab === "ventas" ?
-                    <VentasTab negocioId={currentNegocioId} />
+                {mountedTabs.has("ventas") ?
+                    <div key='panel-ventas' hidden={tab !== "ventas"}>
+                        <VentasTab negocioId={currentNegocioId} />
+                    </div>
                 :   null}
-                {tab === "movimientos" ?
-                    <MovimientosTab negocioId={currentNegocioId} />
+                {mountedTabs.has("movimientos") ?
+                    <div key='panel-movimientos' hidden={tab !== "movimientos"}>
+                        <MovimientosTab negocioId={currentNegocioId} />
+                    </div>
+                :   null}
+                {mountedTabs.has("configuracion") ?
+                    <div key='panel-configuracion' hidden={tab !== "configuracion"}>
+                        <ConfiguracionTab negocioId={currentNegocioId} />
+                    </div>
                 :   null}
             </div>
         </div>

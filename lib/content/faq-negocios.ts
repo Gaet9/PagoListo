@@ -1,4 +1,4 @@
-/** Entrada de FAQ (texto en español, Argentina) para la app Negocios / POS. */
+/** Entrada de FAQ (texto en español, Argentina) para la app PagoListo / POS. */
 
 export type FaqEntry = {
     id: string;
@@ -10,9 +10,9 @@ export type FaqEntry = {
 export const faqItemsHome: readonly FaqEntry[] = [
     {
         id: "que-es-negocios",
-        question: "¿Qué es Negocios?",
+        question: "¿Qué es PagoListo?",
         answer:
-            "Negocios es una aplicación web pensada como POS y gestión liviana para comercios chicos: podés cargar productos, precios, stock, registrar ventas y compras, y ver movimientos de inventario en un solo lugar.",
+            "PagoListo es una aplicación web pensada como POS y gestión liviana para comercios chicos: podés cargar productos, precios, stock, registrar ventas y compras, y ver movimientos de inventario en un solo lugar.",
     },
     {
         id: "para-quien-es",
@@ -88,7 +88,7 @@ export const faqItemsHome: readonly FaqEntry[] = [
     },
     {
         id: "afip",
-        question: "¿Negocios reemplaza a un sistema fiscal o a AFIP?",
+        question: "¿PagoListo reemplaza a un sistema fiscal o a AFIP?",
         answer:
             "No. Es una capa operativa para el día a día del comercio. Los aspectos impositivos, facturación electrónica oficial y obligaciones ante AFIP siguen siendo responsabilidad del titular y de sus asesores.",
     },
@@ -152,7 +152,7 @@ export const faqItemsExtended: readonly FaqEntry[] = [
     },
     {
         id: "costo",
-        question: "¿Cuánto cuesta usar Negocios?",
+        question: "¿Cuánto cuesta usar PagoListo?",
         answer:
             "El costo depende de cómo esté desplegada la solución (planes del proveedor de base de datos, dominio, etc.). Para una instalación de desarrollo o demo, muchas veces se parte de un plan gratuito acotado.",
     },

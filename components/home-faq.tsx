@@ -20,7 +20,7 @@ type Props = {
 
 const defaultHomeSubtitle = (
     <p className='app-section-subtitle mx-0 mt-2 text-left'>
-        Respuestas rápidas sobre cómo funciona Negocios para tu comercio. Para ver el listado completo visitá la{" "}
+        Respuestas rápidas sobre cómo funciona PagoListo para tu comercio. Para ver el listado completo visitá la{" "}
         <Link href='/faq' className='font-medium text-foreground underline-offset-4 hover:underline'>
             página de preguntas frecuentes
         </Link>

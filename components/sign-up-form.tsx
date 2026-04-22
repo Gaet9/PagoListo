@@ -88,7 +88,7 @@ export function SignUpForm({
       <Card>
         <CardHeader>
           <CardTitle>Crear cuenta</CardTitle>
-          <CardDescription>Regístrate para empezar a usar Negocios</CardDescription>
+          <CardDescription>Regístrate para empezar a usar PagoListo</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp}>

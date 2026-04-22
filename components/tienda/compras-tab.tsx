@@ -88,6 +88,18 @@ function formatFechaCorta(iso: string) {
     }).format(new Date(iso));
 }
 
+/** PostgREST / Supabase suele devolver objetos `{ message, details, hint, code }` que no son `Error`. */
+function formatSupabaseCallError(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    if (err && typeof err === "object" && "message" in err) {
+        const o = err as { message?: string; details?: string; hint?: string; code?: string };
+        const parts = [o.message, o.details, o.hint].filter((s): s is string => typeof s === "string" && s.trim().length > 0);
+        if (o.code) parts.push(`código ${o.code}`);
+        return parts.join(" — ") || JSON.stringify(err);
+    }
+    return String(err);
+}
+
 function BotonDescargarComprobante({
     compra,
     descargando,
@@ -98,7 +110,7 @@ function BotonDescargarComprobante({
     onDescargar: (row: CompraNegocioRow) => void;
 }) {
     if (!compra.comprobante_storage_path?.trim()) {
-        return <span className='text-muted-foreground text-xs'>—</span>;
+        return <span className='text-muted-foreground text-xs'>-</span>;
     }
     return (
         <Button
@@ -392,7 +404,7 @@ export function ComprasTab({ negocioId }: Props) {
             });
 
             if (insErr) {
-                const msg = insErr instanceof Error ? insErr.message : String(insErr);
+                const msg = formatSupabaseCallError(insErr);
                 toast.error("No se pudo registrar la compra", { description: msg });
                 setGuardando(false);
                 return;
@@ -415,23 +427,42 @@ export function ComprasTab({ negocioId }: Props) {
         const path = row.comprobante_storage_path?.trim();
         if (!path) return;
         setDescargaCompraId(row.id);
+
+        // Los navegadores móviles suelen bloquear `window.open(url)` si ocurre después de un `await`
+        // (ya no cuenta como acción directa del usuario). Abrimos un placeholder en el mismo turno del click.
+        const newWin = window.open("about:blank", "_blank");
+        if (newWin) {
+            newWin.opener = null;
+        }
+
         const supabase = createClient();
         const { signedUrl, error: signErr } = await getCompraComprobanteSignedUrl(supabase, path);
         setDescargaCompraId(null);
         if (signErr || !signedUrl) {
+            newWin?.close();
             toast.error("No se pudo generar el enlace de descarga", {
                 description: signErr?.message ?? "Intentá de nuevo.",
             });
             return;
         }
-        window.open(signedUrl, "_blank", "noopener,noreferrer");
+
+        if (newWin && !newWin.closed) {
+            try {
+                newWin.location.href = signedUrl;
+            } catch {
+                newWin.close();
+                window.location.assign(signedUrl);
+            }
+        } else {
+            window.location.assign(signedUrl);
+        }
     };
 
     if (loading && productos.length === 0 && comprasRows.length === 0) {
         return (
             <div className='flex items-center gap-2 text-muted-foreground py-8'>
                 <Loader2 className='h-5 w-5 animate-spin' aria-hidden />
-                <span className='text-sm'>Cargando productos…</span>
+                <span className='text-sm'>Cargando compras…</span>
             </div>
         );
     }
@@ -479,12 +510,11 @@ export function ComprasTab({ negocioId }: Props) {
                                 const proveedor = c.proveedor_nombre?.trim() || "Sin proveedor";
                                 const refTxt = c.proveedor_ref?.trim();
                                 const cuitTxt = c.proveedor_cuit_cuil?.trim();
-                                const linePartsSinCuit = [hora, proveedor, refTxt ? `Ref. ${refTxt}` : null].filter(
-                                    (p): p is string => Boolean(p),
+                                const linePartsSinCuit = [hora, proveedor, refTxt ? `Ref. ${refTxt}` : null].filter((p): p is string =>
+                                    Boolean(p),
                                 );
                                 const lineaMetaSinCuit = linePartsSinCuit.join(" · ");
-                                const lineaMetaCompleta =
-                                    cuitTxt ? `${lineaMetaSinCuit} · ${cuitTxt}` : lineaMetaSinCuit;
+                                const lineaMetaCompleta = cuitTxt ? `${lineaMetaSinCuit} · ${cuitTxt}` : lineaMetaSinCuit;
 
                                 return (
                                     <AccordionItem key={c.id} value={`compra-${c.id}`}>
@@ -509,9 +539,8 @@ export function ComprasTab({ negocioId }: Props) {
                                                                     {lineaMetaCompleta}
                                                                 </div>
                                                             </>
-                                                        :   <div className='truncate text-xs text-muted-foreground'>
-                                                                {lineaMetaSinCuit}
-                                                            </div>}
+                                                        :   <div className='truncate text-xs text-muted-foreground'>{lineaMetaSinCuit}</div>
+                                                        }
                                                     </div>
                                                     <div className='shrink-0 text-right'>
                                                         <div className='font-semibold tabular-nums'>{totalStr}</div>

@@ -187,7 +187,12 @@ describe("ComprasTab", () => {
     });
 
     it("muestra compras y permite descargar comprobante con URL firmada", async () => {
-        const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+        const mockLocation = { href: "" };
+        const mockWin = { closed: false, location: mockLocation, close: vi.fn() };
+        const openSpy = vi.spyOn(window, "open").mockImplementation((url?: string | URL) => {
+            if (String(url ?? "") === "about:blank") return mockWin as unknown as Window;
+            return null;
+        });
         listComprasByNegocioPageMock.mockResolvedValue({
             data: [
                 {
@@ -212,7 +217,8 @@ describe("ComprasTab", () => {
         await user.click(await screen.findByRole("button", { name: /Descargar comprobante/i }));
 
         expect(getCompraComprobanteSignedUrlMock).toHaveBeenCalledWith(expect.anything(), "u1/n1/doc.pdf");
-        expect(openSpy).toHaveBeenCalledWith("https://example.com/signed", "_blank", "noopener,noreferrer");
+        expect(openSpy).toHaveBeenCalledWith("about:blank", "_blank");
+        expect(mockLocation.href).toBe("https://example.com/signed");
         openSpy.mockRestore();
     });
 

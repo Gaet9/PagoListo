@@ -4,18 +4,13 @@ import { BreadcrumbHomePrefix } from "@/components/breadcrumb-home-prefix";
 import { HomeFaq } from "@/components/home-faq";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
-import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbList,
-    BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb";
 import { buildFaqPageJsonLd, faqItemsFullPage } from "@/lib/content/faq-negocios";
 
 export const metadata: Metadata = {
-    title: "Preguntas frecuentes — Negocios (POS y stock para comercios)",
+    title: "Preguntas frecuentes - PagoListo (POS y stock para comercios)",
     description:
-        "Respuestas sobre inventario, ventas, compras, códigos de barras, seguridad y uso de Negocios: la app web para kioscos y almacenes en Argentina.",
+        "Respuestas sobre inventario, ventas, compras, códigos de barras, seguridad y uso de PagoListo: la app web para kioscos y almacenes en Argentina.",
     alternates: { canonical: "/faq" },
 };
 
@@ -23,8 +18,8 @@ const faqPageJsonLd = buildFaqPageJsonLd(faqItemsFullPage);
 
 const faqPageSubtitle = (
     <p className='app-section-subtitle mx-0 mt-3 max-w-3xl text-left'>
-        Guía extendida sobre Negocios: gestión de productos, stock, cobros, compras a proveedores, comprobantes y buenas prácticas para comercios
-        chicos. Si no encontrás lo que buscás, consultá también la sección de preguntas en la página de inicio.
+        Guía extendida sobre PagoListo: gestión de productos, stock, cobros, compras a proveedores, comprobantes y buenas prácticas para
+        comercios chicos. Si no encontrás lo que buscás, consultá también la sección de preguntas en la página de inicio.
     </p>
 );
 
@@ -47,7 +42,7 @@ export default function FaqPage() {
                     <HomeFaq
                         items={faqItemsFullPage}
                         accordionValuePrefix='faq-page'
-                        title='Preguntas frecuentes sobre Negocios'
+                        title='Preguntas frecuentes sobre PagoListo'
                         titleId='faq-page-heading'
                         TitleTag='h1'
                         subtitle={faqPageSubtitle}

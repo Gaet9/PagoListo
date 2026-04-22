@@ -111,7 +111,21 @@ describe("ProductosTab", () => {
     await user.click(submit!);
 
     expect(toastSuccess).toHaveBeenCalledWith("Producto añadido");
-    expect(insertCompraReposicionMock).toHaveBeenCalled();
+    expect(insertProductoMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        nombre: "Yerba",
+        stock_actual: 0,
+        precio_compra: 10,
+        precio_venta: 15,
+      }),
+    );
+    expect(insertCompraReposicionMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "n1",
+      [{ producto_id: "p1", cantidad: 5, precio_unitario: 10 }],
+      expect.objectContaining({ notas: "Compra (stock inicial al crear producto)" }),
+    );
   });
 
   it("edits a product and shows success toast when clicking Listo", async () => {

@@ -1,10 +1,10 @@
-# AGENTS.md — Negocios (POS para comercios pequeños)
+# AGENTS.md - PagoListo (POS para comercios pequeños)
 
 Documento de contexto para asistentes de código y desarrolladores. **Idioma de la aplicación (UI y copys): español**, orientado a **Argentina** (comercios chicos, kioscos, almacenes).
 
 ## Qué es la aplicación
 
-**Negocios** es una aplicación web tipo **POS / gestión de comercio** que ayuda a negocios pequeños a:
+**PagoListo** es una aplicación web tipo **POS / gestión de comercio** que ayuda a negocios pequeños a:
 
 - Gestionar **stock** e **inventario** (productos, movimientos).
 - Mantener **precios** (compra y venta) y datos de producto (nombre, SKU, código de barras).
@@ -22,23 +22,23 @@ No sustituye un fiscalizador AFIP ni un ERP completo; es una capa operativa clar
 
 ## Estructura de carpetas (resumen)
 
-| Ubicación               | Responsabilidad                                                                                                                         |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/`                  | Rutas, layouts, páginas. Server Components cuando aplica.                                                                               |
-| `app/globals.css`       | Variables CSS del tema, capa `base` para `body` y **jerarquía `h1`–`h6`**, clases de componente (`.app-hero-title`, `.app-lead`, etc.). |
-| `app/(protected)/`      | Zona autenticada; layout con navegación (sin prefijo de URL).                                                                           |
-| `app/(protected)/tiendas/` | **Mi tienda**: dashboard con pestañas Productos, Ventas, Movimientos.                                                                |
-| `app/auth/`             | Login, registro, recuperación de contraseña, callbacks.                                                                                 |
-| `components/`           | UI reutilizable, formularios, navegación (`site-nav`, `nav-shop-link`).                                                                 |
-| `components/tienda/`    | Tabs de tienda, formularios de negocio/producto, escáner de códigos.                                                                    |
-| `components/ui/`        | Primitivos shadcn + **`PageShell`** (contenedor/sección con variantes de superficie y espaciado).                                       |
-| `lib/supabase/`         | Cliente browser/server, middleware.                                                                                                     |
-| `lib/queries/`          | Acceso a datos por dominio (negocios, productos, ventas, …).                                                                            |
-| `lib/types/`            | Tipos compartidos del dominio (`negocio`, etc.).                                                                                        |
+| Ubicación                  | Responsabilidad                                                                                                                         |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`                     | Rutas, layouts, páginas. Server Components cuando aplica.                                                                               |
+| `app/globals.css`          | Variables CSS del tema, capa `base` para `body` y **jerarquía `h1`–`h6`**, clases de componente (`.app-hero-title`, `.app-lead`, etc.). |
+| `app/(protected)/`         | Zona autenticada; layout con navegación (sin prefijo de URL).                                                                           |
+| `app/(protected)/tiendas/` | **Mi tienda**: dashboard con pestañas Productos, Ventas, Movimientos.                                                                   |
+| `app/auth/`                | Login, registro, recuperación de contraseña, callbacks.                                                                                 |
+| `components/`              | UI reutilizable, formularios, navegación (`site-nav`, `nav-shop-link`).                                                                 |
+| `components/tienda/`       | Tabs de tienda, formularios de negocio/producto, escáner de códigos.                                                                    |
+| `components/ui/`           | Primitivos shadcn + **`PageShell`** (contenedor/sección con variantes de superficie y espaciado).                                       |
+| `lib/supabase/`            | Cliente browser/server, middleware.                                                                                                     |
+| `lib/queries/`             | Acceso a datos por dominio (negocios, productos, ventas, …).                                                                            |
+| `lib/types/`               | Tipos compartidos del dominio (`negocio`, etc.).                                                                                        |
 
 ### Separación de responsabilidades
 
-1. **UI**: `components/` — presentación, accesibilidad, composición.
+1. **UI**: `components/` - presentación, accesibilidad, composición.
 2. **Lógica compartida / helpers**: `lib/` (sin mezclar JSX pesado con queries si se puede evitar).
 3. **Datos**: llamadas a Supabase en `lib/queries/` (y rutas/handlers si se agregan APIs propias).
 

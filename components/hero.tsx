@@ -18,7 +18,7 @@ export function Hero() {
         </a>
       </div>
       <h1 className="sr-only">
-        Negocios: aplicación con Supabase y Next.js
+        PagoListo: aplicación con Supabase y Next.js
       </h1>
       <p className="marketing-tagline">
         Construye tu app con{" "}

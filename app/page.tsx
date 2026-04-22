@@ -33,14 +33,19 @@ export default function Home() {
                     </section>
 
                     <section className='w-full flex justify-center'>
-                        <div className="relative w-full max-w-4xl aspect-hero rounded-2xl overflow-hidden border border-border shadow-lg bg-muted">
+                        <div className='relative w-full max-w-4xl aspect-hero rounded-2xl overflow-hidden border border-border shadow-lg bg-muted'>
+                            {/*
+                              Hero nunca ocupa más de max-w-4xl (896px). sizes acotan el srcset para LCP;
+                              quality algo más baja que el default 75 reduce peso sin notarse en ilustración.
+                            */}
                             <Image
-                                src='/hero-negocio.png'
+                                src='/hero-negocio.webp'
                                 alt='Ilustración de un comercio pequeño gestionando inventario y ventas con una tablet'
                                 fill
                                 className='object-cover'
                                 priority
-                                sizes='(max-width: 896px) 100vw, 896px'
+                                quality={68}
+                                sizes='(max-width: 640px) 100vw, (max-width: 1024px) min(100vw - 2.5rem, 896px), 896px'
                             />
                         </div>
                     </section>

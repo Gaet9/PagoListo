@@ -51,10 +51,23 @@ export type VentaConItemsRow = VentaRow & {
   venta_items: VentaItemRow[] | null;
 };
 
+/** Fila de `venta_mercadopago`: preferencia / pago MP por venta (Checkout Pro). */
+export type VentaMercadoPagoRow = {
+  id: string;
+  venta_id: string;
+  mp_preference_id: string;
+  mp_payment_id: string | null;
+  payment_status: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MovimientoStockRow = {
   id: string;
   producto_id: string;
   tipo: string;
+  /** Texto en BD: `compra`, `venta`, `ajuste` (y valores viejos normalizados en UI). */
+  motivo?: string | null;
   cantidad: number;
   created_at: string;
   /** Precio unitario de referencia (compra o venta según el movimiento). */

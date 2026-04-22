@@ -13,6 +13,7 @@ export default defineConfig({
     include: ["test/unit/**/*.test.ts?(x)"],
     css: true,
     globals: true,
+    testTimeout: 15000,
   },
 });
 

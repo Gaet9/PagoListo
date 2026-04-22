@@ -10,6 +10,8 @@ export type InsertMovimientoStockInput = {
     producto_id: string;
     tipo: MovimientoStockTipo;
     cantidad: number;
+    /** Texto breve para BD (`motivo` NOT NULL en muchos esquemas). Si no se pasa, se infiere de `tipo` y refs. */
+    motivo?: string | null;
     precio_unitario?: number | null;
     venta_id?: string | null;
     compra_id?: string | null;
@@ -18,6 +20,16 @@ export type InsertMovimientoStockInput = {
     venta_item_id?: string | null;
     compra_item_id?: string | null;
 };
+
+/** Valores en BD alineados con triggers (`compra` / `venta`) y ajustes manuales. */
+function defaultMotivoMovimientoStock(input: InsertMovimientoStockInput): string {
+    const t = input.motivo?.trim();
+    if (t) return t;
+    if (input.tipo === "in" || input.compra_id) return "compra";
+    if (input.venta_id) return "venta";
+    if (input.tipo === "ajuste") return "ajuste";
+    return "ajuste";
+}
 
 /** Inserta una fila en `movimientos_stock` (requiere tabla + políticas RLS en Supabase). */
 export async function insertMovimientoStock(client: SupabaseClient, input: InsertMovimientoStockInput) {
@@ -28,6 +40,7 @@ export async function insertMovimientoStock(client: SupabaseClient, input: Inser
     const row: Record<string, unknown> = {
         producto_id: input.producto_id,
         tipo: input.tipo,
+        motivo: defaultMotivoMovimientoStock(input),
         cantidad: qty,
     };
     if (input.precio_unitario != null && Number.isFinite(input.precio_unitario)) {
@@ -51,7 +64,7 @@ export async function insertMovimientoStock(client: SupabaseClient, input: Inser
  * `stock_nuevo` en el mismo bloque (evita desfases por orden de triggers).
  */
 export type RecordProductoStockMovementOpts = {
-    /** Para entradas (reposición): precio de compra unitario de referencia. */
+    /** Precio de compra de referencia (no usado en salidas por ajuste). */
     precioCompra?: number;
     /** Para salidas (ajuste manual desde productos): precio de venta unitario de referencia. */
     precioVenta?: number;
@@ -77,6 +90,7 @@ export async function recordProductoStockMovement(
     return await insertMovimientoStock(client, {
         producto_id: productoId,
         tipo: "out",
+        motivo: "ajuste",
         cantidad: -delta,
         precio_unitario: pv != null && Number.isFinite(pv) && pv >= 0 ? pv : null,
         stock_anterior: prev,
@@ -174,6 +188,7 @@ const movimientosSelect = `
   id,
   producto_id,
   tipo,
+  motivo,
   cantidad,
   created_at,
   precio_unitario,
@@ -191,6 +206,7 @@ const movimientosSelectSearchInner = `
   id,
   producto_id,
   tipo,
+  motivo,
   cantidad,
   created_at,
   precio_unitario,
