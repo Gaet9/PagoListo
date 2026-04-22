@@ -19,6 +19,38 @@ No sustituye un fiscalizador AFIP ni un ERP completo; es una capa operativa clar
 - **Supabase**: Auth (sesión con cookies, `supabase-ssr`), Postgres, políticas **RLS**.
 - **Tailwind CSS** + **shadcn/ui** (componentes en `components/ui/`).
 - Escaneo de códigos de barras en móvil: `@zxing/browser`.
+- **Mercado Pago**: integración **Checkout Pro** vía API de **Preferences** (SDK `mercadopago`), más **OAuth** por negocio para cobrar con la cuenta del vendedor; **webhooks** para confirmar pagos y crear ventas.
+
+## Mercado Pago (Checkout Pro + OAuth)
+
+### Qué está implementado
+
+- **OAuth por negocio** (`negocio_mercadopago_oauth`): PKCE, estado en `mp_oauth_states`, callback persiste tokens; el navegador vuelve a la tienda (origen post-consent: `lib/mercadopago/oauth-post-consent-origin.ts` — en `development` por defecto `http://localhost:3000` si hace falta alinear sesión Supabase con túnel ngrok en `NEXT_PUBLIC_SITE_URL`).
+- **Preferences / Checkout Pro** (`POST app/api/mercadopago/preference/route.ts`): crea preferencia con `access_token` del negocio, `notification_url` hacia `/api/mercadopago/webhook`, `mp_cobro_intentos` con `external_reference` / metadata para correlación.
+- **Webhook** (`app/api/mercadopago/webhook/route.ts`): obtiene el pago vía API MP; reclamo idempotente del intento; RPC para crear venta **solo** si el pago está aprobado. Firma `x-signature` opcional (`MERCADOPAGO_WEBHOOK_ENFORCE_SIGNATURE`).
+- **UI**: `mercadopago-qr.tsx` (QR del `init_point`), `cobrar-tab.tsx`, `configuracion-tab.tsx`, `negocio-mercadopago-status.tsx` en perfil.
+- **SaaS** (opcional): `app/api/mercadopago/saas/preference/route.ts` + `lib/mercadopago/checkout-pro-preference.ts` con token global (`MERCADOPAGO_ACCESS_TOKEN_SAAS`); distinto del cobro por negocio en tienda.
+
+### Archivos clave
+
+| Área               | Ruta                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| OAuth              | `app/api/mercadopago/oauth/start`, `callback`, `status`                                         |
+| Preferencia tienda | `app/api/mercadopago/preference/route.ts`                                                       |
+| Preferencia SaaS   | `app/api/mercadopago/saas/preference/route.ts`                                                  |
+| Webhook            | `app/api/mercadopago/webhook/route.ts`                                                          |
+| Helpers            | `lib/mercadopago/oauth.ts`, `oauth-post-consent-origin.ts`, `client.ts`, `checkout-pro-urls.ts` |
+| Migraciones        | `supabase/migrations/*mercadopago*`, `*mp_*`, OAuth e intentos de cobro                         |
+
+### Variables de entorno
+
+Ver `.env.example`: `MERCADOPAGO_OAUTH_*`, `NEXT_PUBLIC_SITE_URL`, `MERCADOPAGO_OAUTH_BROWSER_RETURN_ORIGIN` (dev), `MERCADOPAGO_WEBHOOK_SECRET`, tokens SaaS si aplica.
+
+### Convenciones al tocar MP
+
+- No exponer **access_token** / **refresh_token** al cliente: solo rutas server y admin Supabase donde corresponda.
+- Nuevos flujos de cobro: mantener **idempotencia** (pagos duplicados / reintentos de webhook).
+- Cambios en componentes de `components/tienda/` o `components/perfil/` relacionados con MP: actualizar o añadir tests en `test/unit/`.
 
 ## Estructura de carpetas (resumen)
 
@@ -27,14 +59,16 @@ No sustituye un fiscalizador AFIP ni un ERP completo; es una capa operativa clar
 | `app/`                     | Rutas, layouts, páginas. Server Components cuando aplica.                                                                               |
 | `app/globals.css`          | Variables CSS del tema, capa `base` para `body` y **jerarquía `h1`–`h6`**, clases de componente (`.app-hero-title`, `.app-lead`, etc.). |
 | `app/(protected)/`         | Zona autenticada; layout con navegación (sin prefijo de URL).                                                                           |
-| `app/(protected)/tiendas/` | **Mi tienda**: dashboard con pestañas Productos, Ventas, Movimientos.                                                                   |
+| `app/(protected)/tiendas/` | **Mi tienda**: dashboard con pestañas (Productos, Ventas, Movimientos, Cobrar, Compras, Configuración, etc.).                           |
+| `app/api/mercadopago/`     | OAuth MP, Preferences (Checkout Pro), webhook, intentos de cobro.                                                                       |
 | `app/auth/`                | Login, registro, recuperación de contraseña, callbacks.                                                                                 |
 | `components/`              | UI reutilizable, formularios, navegación (`site-nav`, `nav-shop-link`).                                                                 |
-| `components/tienda/`       | Tabs de tienda, formularios de negocio/producto, escáner de códigos.                                                                    |
+| `components/tienda/`       | Tabs de tienda, formularios, escáner, cobro MP (QR), configuración MP.                                                                  |
 | `components/ui/`           | Primitivos shadcn + **`PageShell`** (contenedor/sección con variantes de superficie y espaciado).                                       |
 | `lib/supabase/`            | Cliente browser/server, middleware.                                                                                                     |
 | `lib/queries/`             | Acceso a datos por dominio (negocios, productos, ventas, …).                                                                            |
-| `lib/types/`               | Tipos compartidos del dominio (`negocio`, etc.).                                                                                        |
+| `lib/mercadopago/`         | OAuth, URLs Checkout Pro, cliente MP, origen post-consent, preferencias SaaS.                                                           |
+| `lib/types/`               | Tipos compartidos del dominio (`negocio`, estado OAuth MP, etc.).                                                                       |
 
 ### Separación de responsabilidades
 

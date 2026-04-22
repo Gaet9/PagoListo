@@ -11,6 +11,9 @@ Aplicación web en español para gestionar un negocio pequeño: productos, consu
         - **Productos**: alta, edición y baja de productos (nombre, descripción, SKU, código de barras, precios, stock, activo).
         - **Ventas**: listado de ventas del negocio (solo lectura).
         - **Movimientos de stock**: historial de movimientos (solo lectura).
+        - **Cobrar**: cobro en mostrador (efectivo, transferencia, **Mercado Pago** vía **QR** generado con la API de **Checkout Pro** / **Preferences** del vendedor conectado).
+        - **Configuración**: estado de conexión **Mercado Pago** por tienda, cuenta vinculada (email / ID) y enlace OAuth para conectar o cambiar cuenta.
+- **Perfil** (`/perfil`): datos personales y listado de negocios con **estado Mercado Pago** por tienda y enlace a la configuración de esa tienda.
 - **Código de barras (móvil)**: junto a «Añadir producto», en pantallas estrechas aparece un botón de cámara que abre el escáner y rellena el campo **Código barras** (requiere HTTPS o `localhost` y permiso de cámara).
 
 ## Stack técnico
@@ -19,13 +22,13 @@ Aplicación web en español para gestionar un negocio pequeño: productos, consu
 - [Supabase](https://supabase.com): Auth + base de datos
 - [Tailwind CSS](https://tailwindcss.com) y componentes [shadcn/ui](https://ui.shadcn.com)
 - Escáner: [`@zxing/browser`](https://www.npmjs.com/package/@zxing/browser)
-- Pagos (POS): **Mercado Pago** (conexión OAuth por negocio + cobro por QR)
+- Pagos (POS): **Mercado Pago** — **Checkout Pro** vía API de **Preferences** (OAuth por negocio + QR en tienda; webhooks; flujo SaaS opcional con token global)
 
-Consultas y tipos de dominio están en `lib/queries/` y `lib/types/negocio.ts` (negocios, productos, ventas, movimientos).
+Consultas y tipos de dominio están en `lib/queries/` y `lib/types/` (negocios, productos, ventas, movimientos, estado OAuth MP, etc.).
 
 ## Ejecutar en local
 
-1. Crea un proyecto en [Supabase](https://supabase.com/dashboard) y configura el esquema/tablas y RLS según tu despliegue (las consultas del repo asumen tablas coherentes con esos tipos).
+1. Crea un proyecto en [Supabase](https://supabase.com/dashboard) y configura el esquema/tablas y RLS según tu despliegue (las migraciones en `supabase/migrations/` definen el modelo esperado).
 
 2. Copia variables de entorno:
 
@@ -36,25 +39,9 @@ Consultas y tipos de dominio están en `lib/queries/` y `lib/types/negocio.ts` (
     Rellena al menos:
     - `NEXT_PUBLIC_SUPABASE_URL`
     - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (clave publicable o anon del proyecto)
-    - `NEXT_PUBLIC_SITE_URL` (por ejemplo `http://localhost:3000` en local y `https://pagolisto.com.ar` en producción)
+    - `NEXT_PUBLIC_SITE_URL` (por ejemplo `http://localhost:3000` en local y la URL pública en producción; con **ngrok** para pruebas de MP, usa la URL del túnel de forma coherente con el **Redirect URI** de la app MP)
 
     El resto (`SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `DIRECT_URL`) solo si usas migraciones u otras herramientas que lo requieran.
-
-## Mercado Pago (OAuth + cobro por QR)
-
-PagoListo permite que cada **tienda/negocio** conecte su propia cuenta de Mercado Pago vía **OAuth**. Luego, en la pestaña **Cobrar**, se genera un **QR** para que el cliente pague desde la app de Mercado Pago (sin usar un checkout web embebido).
-
-### Configuración (panel de Mercado Pago Developers)
-
-- Crea una **aplicación** en Mercado Pago Developers.
-- Configura el **Redirect URI** a:
-  - `http://localhost:3000/api/mercadopago/oauth/callback` (en local)
-  - y el equivalente en producción.
-- Copia `client_id` y `client_secret` a tu `.env.local`:
-  - `MERCADOPAGO_OAUTH_CLIENT_ID`
-  - `MERCADOPAGO_OAUTH_CLIENT_SECRET`
-- (Opcional) si no quieres derivarlo desde `NEXT_PUBLIC_SITE_URL`, define:
-  - `MERCADOPAGO_OAUTH_REDIRECT_URI`
 
 3. Instala dependencias y arranca:
 
@@ -65,6 +52,51 @@ PagoListo permite que cada **tienda/negocio** conecte su propia cuenta de Mercad
 
     Abre [http://localhost:3000](http://localhost:3000).
 
+## Mercado Pago: Checkout Pro + OAuth por negocio
+
+La integración de cobro en tienda usa la **API de Preferences** de Mercado Pago (Checkout Pro): se crea una **preferencia** con ítems del carrito y se muestra al cliente un **QR** con el `init_point` (o `sandbox_init_point`) para pagar desde la app de Mercado Pago. No se usa el brick de Wallet embebido en la página.
+
+### Flujo resumido
+
+1. **OAuth por negocio**: cada tienda puede vincular su cuenta MP (`/api/mercadopago/oauth/start` → MP → `/api/mercadopago/oauth/callback`). Los tokens se guardan en Supabase (`negocio_mercadopago_oauth`).
+2. **Preferencia**: `POST /api/mercadopago/preference` usa el **access_token del vendedor** del negocio, crea la preferencia y un registro de intento (`mp_cobro_intentos`) con `external_reference` / metadata para el webhook.
+3. **Webhook**: `POST /api/mercadopago/webhook` notifica pagos; se valida el pago con la API MP y, si está **aprobado**, se crea la venta de forma idempotente (evitar duplicados por `mp_payment_id`).
+4. **UI**: pestaña **Cobrar** (QR), **Configuración** (conexión y cuenta), **Perfil** (resumen por negocio).
+
+### Configuración en Mercado Pago Developers
+
+- Crea una **aplicación** y obtén **Client ID** y **Client Secret** (OAuth).
+- **Redirect URI** debe coincidir con tu app (local, producción o ngrok), por ejemplo:
+  - `https://<tu-dominio>/api/mercadopago/oauth/callback`
+- En `.env.local` (ver `.env.example`):
+  - `MERCADOPAGO_OAUTH_CLIENT_ID`, `MERCADOPAGO_OAUTH_CLIENT_SECRET`
+  - Opcional: `MERCADOPAGO_OAUTH_REDIRECT_URI` si no querés derivarlo de `NEXT_PUBLIC_SITE_URL`
+  - Webhook: `MERCADOPAGO_WEBHOOK_SECRET`; opcional `MERCADOPAGO_WEBHOOK_ENFORCE_SIGNATURE` (en flujos QR a veces la firma no aplica; el código hace verificación best-effort).
+- **Desarrollo** (`next dev`): por defecto, tras OAuth el navegador vuelve a `http://localhost:3000` para alinear cookies de Supabase aunque `NEXT_PUBLIC_SITE_URL` sea ngrok; configurable con `MERCADOPAGO_OAUTH_BROWSER_RETURN_ORIGIN`.
+
+### Checkout Pro “SaaS” (token global, opcional)
+
+Para flujos que usan un **access token de aplicación** (no por negocio), existe `POST /api/mercadopago/saas/preference` y variables `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY_SAAS` / `MERCADOPAGO_ACCESS_TOKEN_SAAS` (p. ej. suscripción u otros productos). El cobro en **Mi tienda** prioriza OAuth por negocio.
+
+### Rutas y código útil
+
+| Ruta / módulo | Rol |
+| ------------- | --- |
+| `app/api/mercadopago/oauth/*` | Inicio OAuth, callback, estado (y perfil de cuenta vía `/users/me` en el status). |
+| `app/api/mercadopago/preference/route.ts` | Crea preferencia Checkout Pro con token del negocio. |
+| `app/api/mercadopago/webhook/route.ts` | Notificaciones MP; creación de venta aprobada. |
+| `app/api/mercadopago/cobro-intento/status/route.ts` | Estado del intento (fallback si no usás Realtime). |
+| `lib/mercadopago/oauth.ts`, `oauth-post-consent-origin.ts` | URLs OAuth, PKCE, refresh, origen post-consent. |
+| `lib/mercadopago/client.ts` | Cliente SDK MP con token del vendedor. |
+| `components/tienda/mercadopago-qr.tsx` | QR del `init_point`. |
+| `components/tienda/cobrar-tab.tsx`, `configuracion-tab.tsx` | Cobro y configuración MP. |
+| `components/perfil/negocio-mercadopago-status.tsx` | Estado MP en perfil por negocio. |
+| `supabase/migrations/*mp*` | Tablas OAuth, intentos de cobro, RPC venta aprobada, Realtime opcional. |
+
+### Imagen marketing (hero)
+
+- `npm run optimize:hero` — genera `public/hero-negocio.webp` desde un PNG de entrada (ver `scripts/optimize-hero.mjs`).
+
 ## Scripts útiles
 
 - `npm run dev` - desarrollo
@@ -72,6 +104,7 @@ PagoListo permite que cada **tienda/negocio** conecte su propia cuenta de Mercad
 - `npm run start` - servidor tras `build`
 - `npm test` - unit tests (deben pasar antes de validar cambios de UI)
 - `npm run test:e2e` - e2e (cuando aplique)
+- `npm run optimize:hero` - WebP del hero desde `public/hero-negocio.png` o ruta pasada como argumento
 
 ## Tests (obligatorio)
 
@@ -86,8 +119,10 @@ Antes de dar por **validado** un componente (nuevo, modificado o eliminado), los
 | -------------------------- | ------------------------------------------------------- |
 | `app/(protected)/`         | Layout y páginas que exigen sesión (sin prefijo de URL) |
 | `app/(protected)/tiendas/` | Dashboard «Mi tienda»                                   |
-| `components/tienda/`       | Formularios, pestañas, escáner de códigos               |
+| `app/api/mercadopago/`     | OAuth, Preferences (Checkout Pro), webhook MP           |
+| `components/tienda/`       | Formularios, pestañas, escáner, cobro MP / QR          |
 | `lib/supabase/`            | Cliente browser/server y middleware                     |
 | `lib/queries/`             | Llamadas a Supabase por dominio                         |
+| `lib/mercadopago/`         | OAuth, URLs checkout, cliente MP                        |
 
 Este proyecto partió del ejemplo oficial _Next.js with Supabase_; el README describe la app **PagoListo** tal como está evolucionada en este repositorio.
