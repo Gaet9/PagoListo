@@ -2,10 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { mercadoPagoAmountsMatch } from "@/lib/mercadopago/cobro-amount";
 import { getMercadoPagoAccessTokenForNegocio } from "@/lib/mercadopago/negocio-access-token";
+import { getMercadoPagoSaasAccessToken } from "@/lib/mercadopago/server";
 import {
   shouldRejectMercadoPagoWebhookForSignature,
   verifyMercadoPagoWebhookSignature,
 } from "@/lib/mercadopago/webhook-signature";
+import { processSaasAbonoApprovedPayment } from "@/lib/mercadopago/webhook-saas-abono";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type MercadoPagoWebhookPayload = {
@@ -104,18 +106,38 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  let matchedNegocioId: string | null = null;
-  let payment: MercadoPagoPayment | null = null;
-
-  const tryFetchPayment = async (negocioId: string) => {
-    const accessToken = await getMercadoPagoAccessTokenForNegocio(admin, negocioId);
-    if (!accessToken) return null;
+  const tryFetchPaymentWithToken = async (accessToken: string) => {
     const res = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) return null;
     return (await res.json().catch(() => null)) as MercadoPagoPayment | null;
+  };
+
+  let saasPayment: MercadoPagoPayment | null = null;
+  try {
+    const saasToken = getMercadoPagoSaasAccessToken();
+    saasPayment = await tryFetchPaymentWithToken(saasToken);
+  } catch {
+    saasPayment = null;
+  }
+
+  if (saasPayment) {
+    const saasResult = await processSaasAbonoApprovedPayment(admin, paymentId, saasPayment);
+    if (saasResult.handled && saasResult.reason !== "intento_not_found" && saasResult.reason !== "missing_reference") {
+      console.log("[mercadopago:webhook:saas_abono]", { paymentId, reason: saasResult.reason });
+      return NextResponse.json({ ok: true }, { status: 200 });
+    }
+  }
+
+  let matchedNegocioId: string | null = null;
+  let payment: MercadoPagoPayment | null = null;
+
+  const tryFetchPayment = async (negocioId: string) => {
+    const accessToken = await getMercadoPagoAccessTokenForNegocio(admin, negocioId);
+    if (!accessToken) return null;
+    return tryFetchPaymentWithToken(accessToken);
   };
 
   const { data: tokenRows, error: tokensErr } = await admin.from("negocio_mercadopago_oauth").select("negocio_id").limit(200);
