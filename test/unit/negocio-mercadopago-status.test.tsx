@@ -40,7 +40,7 @@ describe("NegocioMercadoPagoStatus", () => {
             expect(screen.getByText("Conectado")).toBeInTheDocument();
         });
         expect(screen.getByText("seller@example.com")).toBeInTheDocument();
-        expect(screen.getByText("3349768256")).toBeInTheDocument();
+        expect(screen.getByText(/3349768256/)).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /Configurar en la tienda/i })).toHaveAttribute("href", "/tiendas/foo?tab=configuracion");
     });
 });

@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { NegocioListItem } from "@/lib/types/negocio";
 
 export async function listNegocios(client: SupabaseClient) {
   return client
