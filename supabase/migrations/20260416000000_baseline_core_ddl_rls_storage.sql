@@ -174,22 +174,6 @@ COMMENT ON COLUMN public.movimientos_stock.compra_id IS 'ID de compra/registro d
 COMMENT ON COLUMN public.movimientos_stock.venta_item_id IS 'Idempotencia del backfill desde venta_items.';
 COMMENT ON COLUMN public.movimientos_stock.compra_item_id IS 'Idempotencia: una fila de movimiento por línea de compra.';
 
-CREATE TABLE IF NOT EXISTS public.pagos (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  venta_id uuid NOT NULL,
-  metodo text NOT NULL,
-  monto numeric NOT NULL,
-  estado text NOT NULL DEFAULT 'pending'::text,
-  external_id text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT pagos_venta_id_fkey FOREIGN KEY (venta_id) REFERENCES public.ventas (id) ON DELETE CASCADE,
-  CONSTRAINT pagos_metodo_check CHECK (metodo = ANY (ARRAY['cash'::text, 'mercado_pago'::text])),
-  CONSTRAINT pagos_monto_check CHECK (monto >= 0::numeric),
-  CONSTRAINT pagos_estado_check CHECK (estado = ANY (ARRAY['pending'::text, 'paid'::text, 'failed'::text]))
-);
-
-CREATE INDEX IF NOT EXISTS idx_pagos_venta_id ON public.pagos (venta_id);
-
 -- ---------------------------------------------------------------------------
 -- Membership helpers + auth profile bootstrap (live definitions)
 -- ---------------------------------------------------------------------------
@@ -358,7 +342,6 @@ ALTER TABLE public.venta_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.compras ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.compra_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.movimientos_stock ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.pagos ENABLE ROW LEVEL SECURITY;
 
 -- usuarios
 DROP POLICY IF EXISTS usuarios_insert_self ON public.usuarios;
@@ -508,26 +491,6 @@ CREATE POLICY movimientos_stock_update_propietario ON public.movimientos_stock F
      JOIN negocios n ON ((n.id = p.negocio_id)))
   WHERE ((p.id = movimientos_stock.producto_id) AND (n.propietario_id = auth.uid())))));
 
--- pagos
-DROP POLICY IF EXISTS pagos_delete_admin_owner ON public.pagos;
-CREATE POLICY pagos_delete_admin_owner ON public.pagos FOR DELETE TO authenticated USING ((EXISTS ( SELECT 1
-   FROM ventas v
-  WHERE ((v.id = pagos.venta_id) AND has_negocio_role(v.negocio_id, ARRAY['owner'::text, 'admin'::text])))));
-DROP POLICY IF EXISTS pagos_insert_member ON public.pagos;
-CREATE POLICY pagos_insert_member ON public.pagos FOR INSERT TO authenticated WITH CHECK ((EXISTS ( SELECT 1
-   FROM ventas v
-  WHERE ((v.id = pagos.venta_id) AND is_negocio_member(v.negocio_id)))));
-DROP POLICY IF EXISTS pagos_select_member ON public.pagos;
-CREATE POLICY pagos_select_member ON public.pagos FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
-   FROM ventas v
-  WHERE ((v.id = pagos.venta_id) AND is_negocio_member(v.negocio_id)))));
-DROP POLICY IF EXISTS pagos_update_admin_owner ON public.pagos;
-CREATE POLICY pagos_update_admin_owner ON public.pagos FOR UPDATE TO authenticated USING ((EXISTS ( SELECT 1
-   FROM ventas v
-  WHERE ((v.id = pagos.venta_id) AND has_negocio_role(v.negocio_id, ARRAY['owner'::text, 'admin'::text]))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM ventas v
-  WHERE ((v.id = pagos.venta_id) AND has_negocio_role(v.negocio_id, ARRAY['owner'::text, 'admin'::text])))));
-
 -- ---------------------------------------------------------------------------
 -- Table grants (Supabase default pattern for app-facing tables)
 -- ---------------------------------------------------------------------------
@@ -541,7 +504,6 @@ GRANT ALL ON TABLE public.venta_items TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.compras TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.compra_items TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.movimientos_stock TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.pagos TO anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- Storage: compras-comprobantes
