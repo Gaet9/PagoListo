@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 
 import {
     buildFaqPageJsonLd,
-    faqItemsExtended,
     faqItemsFullPage,
     faqItemsHome,
 } from "@/lib/content/faq-negocios";
