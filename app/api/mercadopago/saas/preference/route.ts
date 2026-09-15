@@ -1,57 +1,40 @@
 import { NextResponse, type NextRequest } from "next/server";
+import crypto from "crypto";
 
 import { createCheckoutProPreferenceSaas } from "@/lib/mercadopago/checkout-pro-preference";
+import { getMercadoPagoSaasAbonoWebhookUrl, resolveSaasAbonoPlan } from "@/lib/mercadopago/saas-abono-plan";
+import { getPublicSiteBaseUrl } from "@/lib/mercadopago/checkout-pro-urls";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type PostBody = {
-  items: Array<{
-    id?: string;
-    title?: string;
-    quantity?: number;
-    unit_price?: number;
-    currency_id?: string;
-    description?: string;
-    picture_url?: string;
-  }>;
-  external_reference?: string;
-  payer?: { email?: string; name?: string; surname?: string };
-  notification_url?: string;
-  metadata?: Record<string, unknown>;
+  plan?: string;
 };
 
 function parseBody(json: unknown): PostBody | null {
+  if (json === null || json === undefined) {
+    return {};
+  }
   if (!json || typeof json !== "object") return null;
   const o = json as Record<string, unknown>;
-  if (!Array.isArray(o.items)) return null;
-  return o as PostBody;
+  if (o.plan !== undefined && typeof o.plan !== "string") return null;
+  return { plan: typeof o.plan === "string" ? o.plan : undefined };
 }
 
 export async function POST(request: NextRequest) {
-  let json: unknown;
+  let json: unknown = {};
   try {
-    json = await request.json();
+    const text = await request.text();
+    if (text.trim()) {
+      json = JSON.parse(text) as unknown;
+    }
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   const body = parseBody(json);
-  if (!body?.items?.length) {
-    return NextResponse.json(
-      { error: "Expected a non-empty items array (title, quantity, unit_price per line)." },
-      { status: 400 },
-    );
-  }
-
-  for (const [i, item] of body.items.entries()) {
-    if (typeof item.title !== "string" || !item.title.trim()) {
-      return NextResponse.json({ error: `items[${i}].title is required` }, { status: 400 });
-    }
-    if (typeof item.quantity !== "number" || !Number.isFinite(item.quantity) || item.quantity <= 0) {
-      return NextResponse.json({ error: `items[${i}].quantity must be a positive number` }, { status: 400 });
-    }
-    if (typeof item.unit_price !== "number" || !Number.isFinite(item.unit_price) || item.unit_price < 0) {
-      return NextResponse.json({ error: `items[${i}].unit_price must be a number >= 0` }, { status: 400 });
-    }
+  if (body === null) {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
   const supabase = await createClient();
@@ -64,24 +47,65 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  let plan;
+  try {
+    plan = resolveSaasAbonoPlan(body.plan);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Plan no disponible";
+    return NextResponse.json({ error: message }, { status: 503 });
+  }
+
+  const intentoId = crypto.randomUUID();
+  const baseUrl = getPublicSiteBaseUrl();
+  const notificationUrl = getMercadoPagoSaasAbonoWebhookUrl(baseUrl);
+
   try {
     const preference = await createCheckoutProPreferenceSaas({
-      items: body.items.map((item) => ({
-        id: item.id,
-        title: item.title!.trim(),
-        quantity: item.quantity!,
-        unit_price: item.unit_price!,
-        currency_id: item.currency_id,
-        description: item.description,
-        picture_url: item.picture_url,
-      })),
-      external_reference: body.external_reference,
-      payer: body.payer,
-      notification_url: body.notification_url,
-      metadata: body.metadata,
+      items: [
+        {
+          id: `abono-${plan.code}`,
+          title: plan.title,
+          quantity: plan.quantity,
+          unit_price: plan.unitPriceArs,
+          currency_id: plan.currencyId,
+        },
+      ],
+      external_reference: intentoId,
+      notification_url: notificationUrl,
+      metadata: {
+        kind: "saas_abono",
+        intento_id: intentoId,
+        plan_code: plan.code,
+        usuario_id: user.id,
+      },
+      payer: user.email ? { email: user.email } : undefined,
     });
 
-    return NextResponse.json(preference);
+    const admin = createAdminClient();
+    const { data: intentoRow, error: intentoErr } = await admin
+      .from("mp_saas_abono_intentos")
+      .insert({
+        id: intentoId,
+        usuario_id: user.id,
+        plan_code: plan.code,
+        expected_total_ars: plan.unitPriceArs,
+        mp_preference_id: preference.id,
+      })
+      .select("id")
+      .single();
+
+    if (intentoErr || !intentoRow?.id) {
+      throw new Error(intentoErr?.message || "No se pudo registrar el intento de abono.");
+    }
+
+    return NextResponse.json({
+      id: preference.id,
+      init_point: preference.init_point,
+      sandbox_init_point: preference.sandbox_init_point,
+      intento_id: intentoRow.id,
+      plan_code: plan.code,
+      amount_ars: plan.unitPriceArs,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 502 });
