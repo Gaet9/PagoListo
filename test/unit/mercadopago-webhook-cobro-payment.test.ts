@@ -48,6 +48,19 @@ describe("listNegocioIdsForCobroPaymentFetch", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it("includes both negocios when intento and URL hint disagree (intento first)", async () => {
+    const intentoId = "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a22";
+    const fromIntento = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+    const hintNegocio = "c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a33";
+    const admin = mockAdmin(fromIntento, [fromIntento, hintNegocio]);
+    const ids = await listNegocioIdsForCobroPaymentFetch(admin as never, {
+      negocioId: hintNegocio,
+      intentoId,
+    });
+    expect(ids[0]).toBe(fromIntento);
+    expect(ids[1]).toBe(hintNegocio);
+  });
+
   it("falls back to oauth list when no hints", async () => {
     const a = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
     const b = "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a22";

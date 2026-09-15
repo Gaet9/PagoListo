@@ -48,12 +48,8 @@ export async function listNegocioIdsForCobroPaymentFetch(
       .eq("id", hints.intentoId)
       .maybeSingle();
     const fromIntento = typeof intento?.negocio_id === "string" ? intento.negocio_id : null;
-    if (fromIntento && hints.negocioId && fromIntento !== hints.negocioId) {
-      push(hints.negocioId);
-    } else {
-      push(fromIntento);
-      push(hints.negocioId);
-    }
+    push(fromIntento);
+    push(hints.negocioId);
   } else {
     push(hints.negocioId);
   }
