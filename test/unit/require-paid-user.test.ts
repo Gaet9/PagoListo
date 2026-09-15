@@ -4,17 +4,18 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
 }));
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { requirePaidUser } from "@/lib/auth/require-paid-user";
 
-function createSupabaseMock({ hasClaims }: { hasClaims: boolean }) {
+function createSupabaseMock({ hasClaims }: { hasClaims: boolean }): SupabaseClient {
   return {
     auth: {
       getClaims: vi.fn().mockResolvedValue({
         data: hasClaims ? { claims: { sub: "u1" } } : { claims: null },
       }),
     },
-  } as any;
+  } as unknown as SupabaseClient;
 }
 
 describe("requirePaidUser", () => {

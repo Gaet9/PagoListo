@@ -5,13 +5,11 @@ import { useState } from "react";
 
 import { CrearNegocioForm } from "@/components/tienda/crear-negocio-form";
 import { Button } from "@/components/ui/button";
-import type { NegocioListItem } from "@/lib/types/negocio";
-
 export function CrearTiendaEnPerfil() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  const onCreated = (_n: NegocioListItem) => {
+  const onCreated = () => {
     setOpen(false);
     router.refresh();
   };

@@ -17,6 +17,7 @@ class IntersectionObserverMock {
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).IntersectionObserver =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).IntersectionObserver ?? IntersectionObserverMock;
 
 /** Por defecto escritorio para `(min-width: 768px)`; otras consultas devuelven `matches: false`. */
