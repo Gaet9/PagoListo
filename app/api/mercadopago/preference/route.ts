@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { resolveCobroPreferenceLines, type CobroLineRequest } from "@/lib/mercadopago/cobro-preference-lines";
 import { getMercadoPagoClientForAccessToken } from "@/lib/mercadopago/client";
+import { buildMercadoPagoCobroWebhookUrl } from "@/lib/mercadopago/cobro-webhook-url";
 import { buildCheckoutProBackUrls, getPublicSiteBaseUrl } from "@/lib/mercadopago/checkout-pro-urls";
 import { getMercadoPagoAccessTokenForNegocio } from "@/lib/mercadopago/negocio-access-token";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -18,11 +19,6 @@ type PostBody = {
 function parseBody(json: unknown): PostBody | null {
   if (!json || typeof json !== "object") return null;
   return json as PostBody;
-}
-
-function getMercadoPagoWebhookUrl() {
-  const base = getPublicSiteBaseUrl();
-  return `${base}/api/mercadopago/webhook`;
 }
 
 export async function POST(request: NextRequest) {
@@ -78,7 +74,7 @@ export async function POST(request: NextRequest) {
       back_urls,
       auto_return: "approved",
       external_reference: intentoId,
-      notification_url: getMercadoPagoWebhookUrl(),
+      notification_url: buildMercadoPagoCobroWebhookUrl({ negocioId, intentoId }),
       metadata: {
         intento_id: intentoId,
         negocio_id: negocioId,

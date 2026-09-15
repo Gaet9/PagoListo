@@ -1,7 +1,8 @@
 import crypto from "crypto";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  mercadoPagoWebhookRequiresSignatureHeader,
   shouldRejectMercadoPagoWebhookForSignature,
   verifyMercadoPagoWebhookSignature,
 } from "@/lib/mercadopago/webhook-signature";
@@ -47,6 +48,18 @@ describe("verifyMercadoPagoWebhookSignature", () => {
 });
 
 describe("shouldRejectMercadoPagoWebhookForSignature", () => {
+  const env = process.env;
+
+  beforeEach(() => {
+    process.env = { ...env };
+    delete process.env.MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED;
+    delete process.env.MERCADOPAGO_WEBHOOK_ENFORCE_SIGNATURE;
+  });
+
+  afterEach(() => {
+    process.env = env;
+  });
+
   it("rejects when header is present but invalid", () => {
     expect(
       shouldRejectMercadoPagoWebhookForSignature({
@@ -57,23 +70,29 @@ describe("shouldRejectMercadoPagoWebhookForSignature", () => {
     ).toBe(true);
   });
 
-  it("allows missing header when not enforcing", () => {
+  it("rejects missing header by default (secure)", () => {
+    expect(mercadoPagoWebhookRequiresSignatureHeader()).toBe(true);
     expect(
       shouldRejectMercadoPagoWebhookForSignature({
         xSignature: null,
         signatureOk: false,
-        enforceWhenHeaderMissing: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("allows missing header when ALLOW_UNSIGNED=true", () => {
+    process.env.MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED = "true";
+    expect(mercadoPagoWebhookRequiresSignatureHeader()).toBe(false);
+    expect(
+      shouldRejectMercadoPagoWebhookForSignature({
+        xSignature: null,
+        signatureOk: false,
       }),
     ).toBe(false);
   });
 
-  it("rejects missing header when enforcing", () => {
-    expect(
-      shouldRejectMercadoPagoWebhookForSignature({
-        xSignature: null,
-        signatureOk: false,
-        enforceWhenHeaderMissing: true,
-      }),
-    ).toBe(true);
+  it("allows missing header when legacy ENFORCE_SIGNATURE=false", () => {
+    process.env.MERCADOPAGO_WEBHOOK_ENFORCE_SIGNATURE = "false";
+    expect(mercadoPagoWebhookRequiresSignatureHeader()).toBe(false);
   });
 });
