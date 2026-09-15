@@ -95,7 +95,7 @@ export async function resolveCobroPreferenceLines(
     return { ok: false, error: "El total del cobro debe ser mayor a cero", status: 400 };
   }
 
-  const mpItems: Items[] = lines.map((line, index) => ({
+  const mpItems: Items[] = lines.map((line) => ({
     id: line.producto_id,
     title: line.title,
     quantity: line.qty,
