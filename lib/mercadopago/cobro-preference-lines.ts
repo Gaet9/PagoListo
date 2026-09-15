@@ -4,11 +4,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Items } from "mercadopago/dist/clients/commonTypes";
 
 import { roundMoneyArs } from "@/lib/mercadopago/cobro-amount";
+import { buildCobroQuantityByProduct, type CobroLineQuantityInput } from "@/lib/mercadopago/cobro-line-quantity";
 
-export type CobroLineRequest = {
-  id?: string;
-  quantity?: number;
-};
+export type CobroLineRequest = CobroLineQuantityInput;
 
 export type ResolvedCobroLine = {
   producto_id: string;
@@ -37,21 +35,11 @@ export async function resolveCobroPreferenceLines(
   negocioId: string,
   rawItems: CobroLineRequest[],
 ): Promise<ResolveCobroLinesResult> {
-  if (!rawItems.length) {
-    return { ok: false, error: "Expected a non-empty items array", status: 400 };
+  const qtyMap = buildCobroQuantityByProduct(rawItems);
+  if (!qtyMap.ok) {
+    return { ok: false, error: qtyMap.error, status: qtyMap.status };
   }
-
-  const qtyByProduct = new Map<string, number>();
-  for (const [i, item] of rawItems.entries()) {
-    const productoId = item.id?.trim();
-    if (!productoId) {
-      return { ok: false, error: `items[${i}].id is required`, status: 400 };
-    }
-    if (typeof item.quantity !== "number" || !Number.isFinite(item.quantity) || item.quantity <= 0) {
-      return { ok: false, error: `items[${i}].quantity must be a positive number`, status: 400 };
-    }
-    qtyByProduct.set(productoId, (qtyByProduct.get(productoId) ?? 0) + item.quantity);
-  }
+  const qtyByProduct = qtyMap.qtyByProduct;
 
   const productoIds = [...qtyByProduct.keys()];
   const { data: productos, error } = await admin
