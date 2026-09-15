@@ -41,16 +41,32 @@ export function verifyMercadoPagoWebhookSignature(input: {
 }
 
 /**
+ * Por defecto exigimos `x-signature` (más seguro). QR/IPN sin firma: `MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED=true`.
+ * Compat: `MERCADOPAGO_WEBHOOK_ENFORCE_SIGNATURE=false` sigue permitiendo notificaciones sin firma.
+ */
+export function mercadoPagoWebhookRequiresSignatureHeader(): boolean {
+  const allowUnsigned = (process.env.MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED ?? "").trim().toLowerCase() === "true";
+  if (allowUnsigned) return false;
+
+  const legacyEnforce = (process.env.MERCADOPAGO_WEBHOOK_ENFORCE_SIGNATURE ?? "").trim().toLowerCase();
+  if (legacyEnforce === "false") return false;
+  if (legacyEnforce === "true") return true;
+
+  return true;
+}
+
+/**
  * When MP sends `x-signature`, a bad signature must reject the notification.
- * When the header is absent (some QR flows), verification is skipped and other checks apply.
+ * When the header is absent, rejection follows {@link mercadoPagoWebhookRequiresSignatureHeader}.
  */
 export function shouldRejectMercadoPagoWebhookForSignature(input: {
   xSignature: string | null;
   signatureOk: boolean;
-  enforceWhenHeaderMissing: boolean;
+  enforceWhenHeaderMissing?: boolean;
 }): boolean {
+  const enforceWhenHeaderMissing = input.enforceWhenHeaderMissing ?? mercadoPagoWebhookRequiresSignatureHeader();
   const hasSigHeader = !!input.xSignature?.trim();
   if (hasSigHeader && !input.signatureOk) return true;
-  if (!hasSigHeader && input.enforceWhenHeaderMissing) return true;
+  if (!hasSigHeader && enforceWhenHeaderMissing) return true;
   return false;
 }

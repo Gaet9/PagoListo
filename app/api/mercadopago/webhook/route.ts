@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { mercadoPagoAmountsMatch } from "@/lib/mercadopago/cobro-amount";
-import { getMercadoPagoAccessTokenForNegocio } from "@/lib/mercadopago/negocio-access-token";
+import { resolveCobroIntentoExpectedTotalArs } from "@/lib/mercadopago/cobro-intento-expected-total";
+import { parseMercadoPagoCobroWebhookHints } from "@/lib/mercadopago/cobro-webhook-url";
+import { fetchMercadoPagoCobroPayment } from "@/lib/mercadopago/webhook-cobro-payment";
 import { getMercadoPagoSaasAccessToken } from "@/lib/mercadopago/server";
 import {
   shouldRejectMercadoPagoWebhookForSignature,
@@ -36,10 +38,8 @@ export async function POST(request: NextRequest) {
     console.error("[mercadopago:webhook] MERCADOPAGO_WEBHOOK_SECRET is not set");
     return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
   }
-  const enforceSignatureWhenHeaderMissing =
-    (process.env.MERCADOPAGO_WEBHOOK_ENFORCE_SIGNATURE ?? "").trim().toLowerCase() === "true";
-
   const url = new URL(request.url);
+  const cobroWebhookHints = parseMercadoPagoCobroWebhookHints(url.searchParams);
   const topic = url.searchParams.get("topic") ?? undefined;
   const id = url.searchParams.get("id") ?? undefined;
   const type = url.searchParams.get("type") ?? undefined;
@@ -88,18 +88,11 @@ export async function POST(request: NextRequest) {
     xRequestId,
     dataId: signatureDataId,
   });
-  if (
-    shouldRejectMercadoPagoWebhookForSignature({
-      xSignature,
-      signatureOk,
-      enforceWhenHeaderMissing: enforceSignatureWhenHeaderMissing,
-    })
-  ) {
+  if (shouldRejectMercadoPagoWebhookForSignature({ xSignature, signatureOk })) {
     console.warn("[mercadopago:webhook] invalid_signature", {
       xRequestId,
       hasSig: !!xSignature,
       signatureDataId,
-      enforceSignatureWhenHeaderMissing,
     });
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
@@ -131,33 +124,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  let matchedNegocioId: string | null = null;
-  let payment: MercadoPagoPayment | null = null;
-
-  const tryFetchPayment = async (negocioId: string) => {
-    const accessToken = await getMercadoPagoAccessTokenForNegocio(admin, negocioId);
-    if (!accessToken) return null;
-    return tryFetchPaymentWithToken(accessToken);
-  };
-
-  const { data: tokenRows, error: tokensErr } = await admin.from("negocio_mercadopago_oauth").select("negocio_id").limit(200);
-  if (tokensErr) {
-    console.error("[mercadopago:webhook] tokens_error", tokensErr.message);
-    return NextResponse.json({ ok: true }, { status: 200 });
-  }
-  for (const row of tokenRows ?? []) {
-    const negocioId = row.negocio_id as string;
-    try {
-      const fetched = await tryFetchPayment(negocioId);
-      if (fetched) {
-        payment = fetched;
-        matchedNegocioId = negocioId;
-        break;
-      }
-    } catch {
-      // ignore and keep trying
-    }
-  }
+  const cobroFetch = await fetchMercadoPagoCobroPayment(admin, paymentId, cobroWebhookHints);
+  const payment = cobroFetch?.payment ?? null;
+  const matchedNegocioId = cobroFetch?.negocioId ?? null;
 
   if (!payment || !matchedNegocioId) {
     console.warn("[mercadopago:webhook] payment_not_found_for_any_token", { paymentId });
@@ -224,23 +193,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true }, { status: 200 });
   }
 
-  const expectedTotalRaw = intento.expected_total_ars;
-  const expectedTotal =
-    expectedTotalRaw === null || expectedTotalRaw === undefined ?
-      null
-    : typeof expectedTotalRaw === "number" ?
-      expectedTotalRaw
-    : parseFloat(String(expectedTotalRaw));
-  if (expectedTotal !== null && Number.isFinite(expectedTotal) && expectedTotal > 0) {
-    if (paidAmount === null || !mercadoPagoAmountsMatch(expectedTotal, paidAmount)) {
-      console.warn("[mercadopago:webhook] amount_mismatch", {
-        paymentId,
-        expectedTotal,
-        paidAmount,
-        intentoId: intento.id,
-      });
-      return NextResponse.json({ ok: true }, { status: 200 });
-    }
+  const expectedTotal = await resolveCobroIntentoExpectedTotalArs(
+    admin,
+    intento.negocio_id,
+    intento.expected_total_ars,
+    intento.items,
+  );
+  if (expectedTotal === null || expectedTotal <= 0) {
+    console.warn("[mercadopago:webhook] expected_total_unresolved", {
+      paymentId,
+      intentoId: intento.id,
+    });
+    return NextResponse.json({ ok: true }, { status: 200 });
+  }
+  if (paidAmount === null || !mercadoPagoAmountsMatch(expectedTotal, paidAmount)) {
+    console.warn("[mercadopago:webhook] amount_mismatch", {
+      paymentId,
+      expectedTotal,
+      paidAmount,
+      intentoId: intento.id,
+    });
+    return NextResponse.json({ ok: true }, { status: 200 });
   }
 
   const nowIso = new Date().toISOString();
