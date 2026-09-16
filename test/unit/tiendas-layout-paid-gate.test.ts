@@ -4,8 +4,9 @@ import { resolve } from "node:path";
 import { describe, it, expect } from "vitest";
 
 /**
- * Guardrail: paywall redirect must run in layout (outside page Suspense) to avoid Next 500
- * with cacheComponents + redirect under Suspense.
+ * Guardrail: paywall redirect must run in layout (not inside page Suspense) to avoid Next 500
+ * with cacheComponents + redirect under page Suspense. The layout may use its own Suspense
+ * boundary so PPR/build does not treat subscription checks as blocking the route shell.
  */
 describe("tiendas paid-user gate placement", () => {
   it("calls requirePaidUser in layout, not inside page Suspense children", () => {

@@ -73,6 +73,14 @@ function subscriptionRowFromCore(
   };
 }
 
+function isMissingSubscriptionColumnError(message: string, code?: string): boolean {
+  return (
+    /column.+does not exist/i.test(message) ||
+    code === "42703" ||
+    code === "PGRST204"
+  );
+}
+
 export async function fetchUserSubscription(
   supabase: SupabaseClient,
   userId: string,
@@ -88,12 +96,7 @@ export async function fetchUserSubscription(
       return { row: data ?? null, error: null };
     }
 
-    const isMissingColumn =
-      /column.+does not exist/i.test(error.message) ||
-      error.code === "42703" ||
-      error.code === "PGRST204";
-
-    if (!isMissingColumn) {
+    if (!isMissingSubscriptionColumnError(error.message, error.code)) {
       return { row: null, error: error.message };
     }
 
