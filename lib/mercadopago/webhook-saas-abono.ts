@@ -118,6 +118,7 @@ export async function processSaasAbonoApprovedPayment(
       status: "active",
       plan_code: intento.plan_code,
       current_period_end: nextEnd.toISOString(),
+      canceled_at: null,
       updated_at: nowIso,
     },
     { onConflict: "user_id" },
