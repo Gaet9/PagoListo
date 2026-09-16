@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { MercadoPagoCuentaDetalles } from "@/components/tienda/mercadopago-cuenta-detalles";
-import { MercadoPagoOAuthFlashBanner } from "@/components/tienda/mercadopago-oauth-flash";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-shell";
 import { Spinner } from "@/components/ui/spinner";
