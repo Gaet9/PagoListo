@@ -84,7 +84,7 @@ Para flujos que usan un **access token de aplicación** (no por negocio), existe
 
 | Ruta / módulo | Rol |
 | ------------- | --- |
-| `app/api/mercadopago/oauth/*` | Inicio OAuth, callback, estado (y perfil de cuenta vía `/users/me` en el status). |
+| `app/api/mercadopago/oauth/*` | Inicio OAuth, callback, estado, **desvincular** (`disconnect`), perfil de cuenta vía `/users/me` en el status). |
 | `app/api/mercadopago/preference/route.ts` | Crea preferencia Checkout Pro con token del negocio. |
 | `app/api/mercadopago/webhook/route.ts` | Notificaciones MP; creación de venta aprobada. |
 | `app/api/mercadopago/cobro-intento/status/route.ts` | Estado del intento (fallback si no usás Realtime). |
