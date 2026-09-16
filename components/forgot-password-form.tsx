@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useState } from "react";
+import { getForgotPasswordErrorMessage } from "@/lib/auth/forgot-password-error-message";
 
 export function ForgotPasswordForm({
   className,
@@ -37,7 +38,7 @@ export function ForgotPasswordForm({
       if (error) throw error;
       setSuccess(true);
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Ocurrió un error");
+      setError(getForgotPasswordErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
