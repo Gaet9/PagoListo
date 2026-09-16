@@ -50,9 +50,8 @@ export async function POST(request: NextRequest) {
   let plan;
   try {
     plan = resolveSaasAbonoPlan(body.plan);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Plan no disponible";
-    return NextResponse.json({ error: message }, { status: 503 });
+  } catch {
+    return NextResponse.json({ error: "El precio del abono no está disponible." }, { status: 503 });
   }
 
   const intentoId = crypto.randomUUID();

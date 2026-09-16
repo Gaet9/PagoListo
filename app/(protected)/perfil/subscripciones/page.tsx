@@ -47,10 +47,9 @@ async function PerfilSubscripcionesContent({
     const plan = resolveSaasAbonoPlan("mensual");
     amountLabel = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(plan.unitPriceArs);
     checkoutEnabled = true;
-  } catch (e) {
-    planConfigError =
-      e instanceof Error ? e.message : "Configurá PAGOLISTO_SAAS_PLAN_MENSUAL_ARS en el servidor.";
-    amountLabel = "Precio no disponible";
+  } catch {
+    planConfigError = "No se pudo cargar el precio del abono. Revisá la configuración en el servidor.";
+    amountLabel = "—";
   }
 
   const accessUntilLabel =
