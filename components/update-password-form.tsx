@@ -11,6 +11,7 @@ import {
   RECOVERY_REDIRECTING_MESSAGE,
   RECOVERY_SESSION_EXPIRED_MESSAGE,
   RECOVERY_SESSION_MISSING_MESSAGE,
+  RECOVERY_SESSION_VERIFY_TIMEOUT_MS,
   RECOVERY_VERIFYING_MESSAGE,
 } from "@/lib/auth/password-recovery";
 import { Button } from "@/components/ui/button";
@@ -45,38 +46,72 @@ export function UpdatePasswordForm({
 
   useEffect(() => {
     let cancelled = false;
+    let sessionResolved = false;
+    let verifyTimeoutId: ReturnType<typeof window.setTimeout> | undefined;
+
     const supabase = createClient();
     const searchParams = new URLSearchParams(window.location.search);
     const exchangePath = getRecoverySessionExchangePath(searchParams);
     const recoveryCode = searchParams.get("code");
 
+    const clearVerifyTimeout = () => {
+      if (verifyTimeoutId !== undefined) {
+        window.clearTimeout(verifyTimeoutId);
+        verifyTimeoutId = undefined;
+      }
+    };
+
+    const markSessionReady = () => {
+      if (cancelled) return;
+      sessionResolved = true;
+      clearVerifyTimeout();
+      setSessionStatus("ready");
+      setSessionMessage(null);
+      setManualExchangeHref(null);
+    };
+
     const resolveSession = async (): Promise<boolean> => {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+      if (!sessionError && session?.user) {
+        markSessionReady();
+        return true;
+      }
+
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
       if (userError || !user) return false;
-      if (!cancelled) {
-        setSessionStatus("ready");
-        setSessionMessage(null);
-        setManualExchangeHref(null);
-      }
+
+      markSessionReady();
       return true;
     };
 
     const failSession = (message: string) => {
       if (cancelled) return;
+      sessionResolved = true;
+      clearVerifyTimeout();
       setSessionStatus("error");
       setSessionMessage(message);
     };
 
+    verifyTimeoutId = window.setTimeout(() => {
+      if (!cancelled && !sessionResolved) {
+        failSession(RECOVERY_SESSION_MISSING_MESSAGE);
+      }
+    }, RECOVERY_SESSION_VERIFY_TIMEOUT_MS);
+
     const waitForRedirectOrTimeout = (path: string) => {
+      clearVerifyTimeout();
       setSessionStatus("redirecting");
       setManualExchangeHref(`${window.location.origin}${path}`);
       window.location.replace(path);
       return new Promise<void>((resolve) => {
         window.setTimeout(() => {
-          if (!cancelled) {
+          if (!cancelled && !sessionResolved) {
             failSession(RECOVERY_REDIRECT_FAILED_MESSAGE);
           }
           resolve();
@@ -87,6 +122,7 @@ export function UpdatePasswordForm({
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event) => {
         if (
+          event === "INITIAL_SESSION" ||
           event === "SIGNED_IN" ||
           event === "PASSWORD_RECOVERY" ||
           event === "TOKEN_REFRESHED"
@@ -125,14 +161,14 @@ export function UpdatePasswordForm({
         return;
       }
 
-      const hasSession = await resolveSession();
-      if (!hasSession && !cancelled) {
+      if (!cancelled && !sessionResolved) {
         failSession(RECOVERY_SESSION_MISSING_MESSAGE);
       }
     })();
 
     return () => {
       cancelled = true;
+      clearVerifyTimeout();
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -150,10 +186,18 @@ export function UpdatePasswordForm({
 
     try {
       const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+      const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
-      if (userError || !user) {
+      if (
+        sessionError ||
+        userError ||
+        (!session?.user && !user)
+      ) {
         throw new Error(RECOVERY_SESSION_MISSING_MESSAGE);
       }
 

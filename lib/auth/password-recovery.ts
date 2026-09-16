@@ -53,6 +53,9 @@ export const RECOVERY_SESSION_EXPIRED_MESSAGE =
 /** Tiempo máximo en pantalla de redirección antes de mostrar error (p. ej. webview que bloquea `location.replace`). */
 export const RECOVERY_EXCHANGE_REDIRECT_TIMEOUT_MS = 10_000;
 
+/** Tiempo máximo en «Verificando…» antes de asumir que no hay sesión de recuperación. */
+export const RECOVERY_SESSION_VERIFY_TIMEOUT_MS = 15_000;
+
 export const RECOVERY_VERIFYING_MESSAGE =
   "Verificando tu enlace de recuperación…";
 

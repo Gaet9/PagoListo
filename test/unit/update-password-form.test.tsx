@@ -7,8 +7,11 @@ import {
   RECOVERY_EXCHANGE_REDIRECT_TIMEOUT_MS,
   RECOVERY_REDIRECT_FAILED_MESSAGE,
   RECOVERY_REDIRECTING_MESSAGE,
+  RECOVERY_SESSION_MISSING_MESSAGE,
+  RECOVERY_SESSION_VERIFY_TIMEOUT_MS,
 } from "@/lib/auth/password-recovery";
 
+const getSessionMock = vi.fn();
 const getUserMock = vi.fn();
 const updateUserMock = vi.fn();
 const exchangeCodeForSessionMock = vi.fn();
@@ -40,6 +43,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     auth: {
+      getSession: (...args: unknown[]) => getSessionMock(...args),
       getUser: (...args: unknown[]) => getUserMock(...args),
       updateUser: (...args: unknown[]) => updateUserMock(...args),
       exchangeCodeForSession: (...args: unknown[]) =>
@@ -51,6 +55,7 @@ vi.mock("@/lib/supabase/client", () => ({
 
 describe("UpdatePasswordForm", () => {
   beforeEach(() => {
+    getSessionMock.mockReset();
     getUserMock.mockReset();
     updateUserMock.mockReset();
     exchangeCodeForSessionMock.mockReset();
@@ -59,6 +64,8 @@ describe("UpdatePasswordForm", () => {
     onAuthStateChangeMock.mockReturnValue({
       data: { subscription: { unsubscribe: vi.fn() } },
     });
+    getSessionMock.mockResolvedValue({ data: { session: null }, error: null });
+    getUserMock.mockResolvedValue({ data: { user: null }, error: null });
     window.history.replaceState({}, "", "/auth/update-password");
   });
 
@@ -68,8 +75,6 @@ describe("UpdatePasswordForm", () => {
   });
 
   it("muestra error si no hay sesión de recuperación", async () => {
-    getUserMock.mockResolvedValue({ data: { user: null }, error: null });
-
     render(<UpdatePasswordForm />);
 
     await waitFor(() => {
@@ -83,7 +88,29 @@ describe("UpdatePasswordForm", () => {
     ).toBeDisabled();
   });
 
+  it("habilita el formulario cuando getSession trae sesión aunque getUser no", async () => {
+    getSessionMock.mockResolvedValue({
+      data: { session: { user: { id: "user-1" } } },
+      error: null,
+    });
+    getUserMock.mockResolvedValue({ data: { user: null }, error: null });
+
+    render(<UpdatePasswordForm />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /guardar contraseña/i }),
+      ).not.toBeDisabled();
+    });
+
+    expect(getSessionMock).toHaveBeenCalled();
+  });
+
   it("actualiza la contraseña cuando hay sesión", async () => {
+    getSessionMock.mockResolvedValue({
+      data: { session: { user: { id: "user-1" } } },
+      error: null,
+    });
     getUserMock.mockResolvedValue({
       data: { user: { id: "user-1" } },
       error: null,
@@ -113,8 +140,8 @@ describe("UpdatePasswordForm", () => {
     );
     stubLocationWithReplaceMock();
     exchangeCodeForSessionMock.mockResolvedValue({ error: null });
-    getUserMock.mockResolvedValue({
-      data: { user: { id: "user-1" } },
+    getSessionMock.mockResolvedValue({
+      data: { session: { user: { id: "user-1" } } },
       error: null,
     });
 
@@ -144,7 +171,6 @@ describe("UpdatePasswordForm", () => {
     exchangeCodeForSessionMock.mockResolvedValue({
       error: new Error("invalid"),
     });
-    getUserMock.mockResolvedValue({ data: { user: null }, error: null });
 
     render(<UpdatePasswordForm />);
 
@@ -168,5 +194,25 @@ describe("UpdatePasswordForm", () => {
     await waitFor(() => {
       expect(screen.getByText(RECOVERY_REDIRECT_FAILED_MESSAGE)).toBeInTheDocument();
     });
+  });
+
+  it("deja de verificar tras timeout duro si la sesión nunca resuelve", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    getSessionMock.mockImplementation(() => new Promise(() => {}));
+    getUserMock.mockImplementation(() => new Promise(() => {}));
+
+    render(<UpdatePasswordForm />);
+
+    expect(screen.getByText(/verificando tu enlace/i)).toBeInTheDocument();
+
+    await vi.advanceTimersByTimeAsync(RECOVERY_SESSION_VERIFY_TIMEOUT_MS);
+
+    await waitFor(() => {
+      expect(screen.getByText(RECOVERY_SESSION_MISSING_MESSAGE)).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole("link", { name: /pedir un enlace nuevo/i }),
+    ).toHaveAttribute("href", "/auth/forgot-password");
   });
 });
