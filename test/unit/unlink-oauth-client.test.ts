@@ -18,7 +18,7 @@ describe("unlinkMercadoPagoOAuth", () => {
         expect(result.ok).toBe(false);
         if (!result.ok) {
             expect(result.notImplemented).toBe(true);
-            expect(result.message).toMatch(/Rodrigo/i);
+            expect(result.message).toMatch(/Vincular otra cuenta/i);
         }
     });
 });

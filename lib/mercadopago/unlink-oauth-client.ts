@@ -1,20 +1,21 @@
+import { MERCADOPAGO_OAUTH_UNLINK_API_PATH } from "@/lib/mercadopago/oauth-unlink-endpoint";
+
 export type UnlinkMercadoPagoOAuthResult = { ok: true } | { ok: false; message: string; notImplemented?: boolean };
 
-/** Contrato para Rodrigo (GAE-8): `POST /api/mercadopago/oauth/unlink` con `{ negocioId }`. */
 export async function unlinkMercadoPagoOAuth(negocioId: string): Promise<UnlinkMercadoPagoOAuthResult> {
-    const res = await fetch("/api/mercadopago/oauth/unlink", {
+    const res = await fetch(MERCADOPAGO_OAUTH_UNLINK_API_PATH, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ negocioId }),
     });
     const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
-    if (res.status === 501 || data.code === "not_implemented") {
+    if (res.status === 404 || res.status === 501 || data.code === "not_implemented") {
         return {
             ok: false,
             notImplemented: true,
             message:
-                "Todavía no está disponible desvincular desde la app. Rodrigo está habilitando el endpoint seguro; probá de nuevo en unos minutos o usá «Cambiar cuenta» para vincular otra cuenta de Mercado Pago.",
+                "Todavía no está habilitada la desvinculación en el servidor. Mientras tanto, usá «Vincular otra cuenta» para cambiar la cuenta de Mercado Pago, o probá «Desvincular» de nuevo más tarde.",
         };
     }
     if (!res.ok) {

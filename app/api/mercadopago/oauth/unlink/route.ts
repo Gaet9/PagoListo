@@ -3,8 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * GAE-37 (UI) — contrato para desvincular MP por negocio.
- * Implementación segura (revoke en MP + borrado server-side de tokens): Rodrigo (GAE-8).
+ * Placeholder GAE-37 hasta GAE-8 (Rodrigo, bc-f448bb1e): misma ruta documentada en
+ * `MERCADOPAGO_OAUTH_UNLINK_API_PATH`. Será reemplazada por revoke + delete server-side.
+ * Sin lectura ni borrado de tokens en este stub.
  */
 export async function POST(request: NextRequest) {
     let json: unknown;
