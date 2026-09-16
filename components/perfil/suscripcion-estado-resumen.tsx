@@ -90,5 +90,5 @@ export function subscriptionAllowsCancel(row: UserSubscriptionRow | null): boole
 
 export function subscriptionAllowsCheckout(row: UserSubscriptionRow | null): boolean {
   const phase = resolveSubscriptionUiPhase(row);
-  return phase === "none" || phase === "expired";
+  return phase === "none" || phase === "expired" || phase === "canceled_until_end";
 }

@@ -58,13 +58,21 @@ describe("subscription action helpers", () => {
     ).toBe(false);
   });
 
-  it("allows checkout when unpaid or expired", () => {
+  it("allows checkout when unpaid, expired, or canceled until period end", () => {
     expect(subscriptionAllowsCheckout(null)).toBe(true);
     expect(
       subscriptionAllowsCheckout({
         status: "active",
         current_period_end: "2020-01-01T00:00:00.000Z",
         plan_code: "mensual",
+      }),
+    ).toBe(true);
+    expect(
+      subscriptionAllowsCheckout({
+        status: "canceled",
+        current_period_end: "2099-01-01T00:00:00.000Z",
+        plan_code: "mensual",
+        canceled_at: "2026-06-01T00:00:00.000Z",
       }),
     ).toBe(true);
     expect(
