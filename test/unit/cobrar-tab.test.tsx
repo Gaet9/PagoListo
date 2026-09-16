@@ -31,6 +31,10 @@ vi.mock("@/components/tienda/barcode-scanner-dialog", () => ({
     BarcodeScannerDialog: () => null,
 }));
 
+vi.mock("@/components/tienda/mercadopago-oauth-status-banner", () => ({
+    MercadoPagoOAuthStatusBanner: () => null,
+}));
+
 describe("CobrarTab", () => {
     beforeEach(() => {
         listProductosMock.mockReset();

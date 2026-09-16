@@ -6,6 +6,7 @@ import { BreadcrumbHomePrefix } from "@/components/breadcrumb-home-prefix";
 import { CrearTiendaEnPerfil } from "@/components/perfil/crear-tienda-en-perfil";
 import { EliminarNegocioDialog } from "@/components/perfil/eliminar-negocio-dialog";
 import { NegocioMercadoPagoStatus } from "@/components/perfil/negocio-mercadopago-status";
+import { PerfilOAuthFlash } from "@/components/perfil/perfil-oauth-flash";
 import { CambiarContrasenaPerfilCard } from "@/components/perfil/cambiar-contrasena-perfil-card";
 import { SuscripcionEstadoResumen } from "@/components/perfil/suscripcion-estado-resumen";
 import { UsuarioPerfilForm } from "@/components/perfil/usuario-perfil-form";
@@ -80,6 +81,12 @@ async function PerfilContent() {
             </div>
 
             <UsuarioPerfilForm initial={usuario} />
+
+            <PerfilOAuthFlash
+                primeraTiendaHref={
+                    negociosList[0] ? `/tiendas/${buildNegocioSlug(negociosList[0], negociosList)}` : undefined
+                }
+            />
 
             <CambiarContrasenaPerfilCard email={usuario.email} />
 
