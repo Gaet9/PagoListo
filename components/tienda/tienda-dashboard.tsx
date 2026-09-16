@@ -8,6 +8,7 @@ import { ConfiguracionTab } from "./configuracion-tab";
 import { MovimientosTab } from "./movimientos-tab";
 import { ProductosTab } from "./productos-tab";
 import { VentasTab } from "./ventas-tab";
+import { MercadoPagoOAuthFlashBanner } from "./mercadopago-oauth-flash";
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeftRight, Banknote, Package, Receipt, Settings, ShoppingCart } from "lucide-react";
@@ -108,6 +109,8 @@ export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
                     </div>
                 :   null}
             </div>
+
+            <MercadoPagoOAuthFlashBanner />
 
             <div
                 className={cn(

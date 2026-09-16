@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { MercadoPagoCuentaDetalles } from "@/components/tienda/mercadopago-cuenta-detalles";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { buildMercadoPagoOAuthStartPath } from "@/lib/mercadopago/oauth-start-url";
 import type { MercadoPagoOAuthStatusResponse } from "@/lib/types/mercadopago-oauth-status";
 
 type Props = {
     negocioId: string;
-    /** Enlace a la tienda con pestaña Configuración (conectar / cambiar cuenta). */
+    /** Enlace a la tienda con pestaña Configuración (detalle y cambiar cuenta). */
     configuracionHref: string;
 };
 
@@ -42,6 +45,8 @@ export function NegocioMercadoPagoStatus({ negocioId, configuracionHref }: Props
         void load();
     }, [load]);
 
+    const connectHref = buildMercadoPagoOAuthStartPath(negocioId, "/perfil");
+
     return (
         <div className='mt-3 space-y-2 border-t border-border/60 pt-3'>
             <p className='text-xs font-medium text-muted-foreground'>Mercado Pago</p>
@@ -52,34 +57,28 @@ export function NegocioMercadoPagoStatus({ negocioId, configuracionHref }: Props
                     <span>Cargando…</span>
                 </div>
             : error ?
-                <p className='text-xs text-destructive'>{error}</p>
-            : status?.connected ?
-                <div className='space-y-1 text-xs text-muted-foreground'>
-                    <p>
-                        <span className='text-foreground font-medium'>Conectado</span>
-                        {status.account_label ?
-                            <span className='text-muted-foreground'> — {status.mp_user_id}</span>
-                        :   null}
-                    </p>
-                    {status.account_email ?
-                        <p>
-                            Email: <span className='text-foreground'>{status.account_email}</span>
-                        </p>
-                    :   null}
-                    {status.account_nickname && !status.account_email ?
-                        <p>
-                            Usuario: <span className='text-foreground'>{status.account_nickname}</span>
-                        </p>
-                    :   null}
+                <div className='space-y-2'>
+                    <p className='text-xs text-destructive' role='alert'>{error}</p>
+                    <Button type='button' size='sm' variant='outline' className='h-8' onClick={() => void load()}>
+                        Reintentar
+                    </Button>
                 </div>
-            :   <p className='text-xs text-muted-foreground'>
-                    <span className='text-foreground font-medium'>No conectado</span>
-                </p>
+            : status?.connected ?
+                <div className='space-y-1'>
+                    <p className='text-xs font-medium text-foreground'>Vinculado para cobrar con QR</p>
+                    <MercadoPagoCuentaDetalles status={status} size='sm' />
+                </div>
+            :   <div className='space-y-2'>
+                    <p className='text-xs text-muted-foreground'>Sin cuenta vinculada. Conectá Mercado Pago para facturar/cobrar.</p>
+                    <Button type='button' size='sm' className='h-8' onClick={() => (window.location.href = connectHref)}>
+                        Conectar Mercado Pago
+                    </Button>
+                </div>
             }
 
             <p className='text-xs'>
                 <Link href={configuracionHref} className='text-primary underline-offset-4 hover:underline'>
-                    Configurar en la tienda
+                    Ver en Configuración de la tienda
                 </Link>
             </p>
         </div>

@@ -5,6 +5,7 @@ import { listProductos } from "@/lib/queries/productos";
 import type { ProductoRow } from "@/lib/types/negocio";
 import { BarcodeScannerDialog } from "@/components/tienda/barcode-scanner-dialog";
 import { MercadoPagoQr } from "@/components/tienda/mercadopago-qr";
+import { buildMercadoPagoOAuthStartPath } from "@/lib/mercadopago/oauth-start-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -458,15 +459,20 @@ export function CobrarTab({ negocioId }: Props) {
                                 Preparando QR…
                             </div>
                         : qrConnected === false ?
-                            <div className='flex flex-col gap-2'>
-                                <p className='text-sm text-muted-foreground'>Primero conectá la cuenta de Mercado Pago de esta tienda.</p>
+                            <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center'>
+                                <p className='text-sm text-muted-foreground min-w-0 flex-1'>
+                                    Conectá la cuenta de Mercado Pago de esta tienda (un clic, volvés a Cobrar al terminar).
+                                </p>
                                 <Button
                                     type='button'
+                                    className='shrink-0'
                                     onClick={() => {
-                                        const redirectTo = `${window.location.origin}/tiendas`;
-                                        window.location.href = `/api/mercadopago/oauth/start?negocioId=${encodeURIComponent(negocioId)}&redirectTo=${encodeURIComponent(redirectTo)}`;
+                                        const params = new URLSearchParams(window.location.search);
+                                        params.set("tab", "cobrar");
+                                        const redirectTo = `${window.location.pathname}?${params.toString()}`;
+                                        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, redirectTo);
                                     }}>
-                                    Conectar Mercado Pago
+                                    Conectar con Mercado Pago
                                 </Button>
                             </div>
                         : qrInitPoint ?

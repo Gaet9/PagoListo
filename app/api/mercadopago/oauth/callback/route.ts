@@ -1,24 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { buildOAuthCallbackErrorRedirect, buildOAuthCallbackRedirect } from "@/lib/mercadopago/oauth-callback-redirect";
 import { exchangeCodeForToken, getMercadoPagoOAuthPostConsentOrigin } from "@/lib/mercadopago/oauth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-function badRequest(message: string) {
-    return NextResponse.json({ error: message }, { status: 400 });
+function redirectWithError(
+    postOrigin: string,
+    redirectTo: string | null | undefined,
+    code: "estado_invalido" | "estado_expirado" | "intercambio_fallido" | "guardado_fallido" | "cancelado" | "falta_autorizacion",
+) {
+    const target = buildOAuthCallbackErrorRedirect(postOrigin, redirectTo, code);
+    return NextResponse.redirect(target);
 }
 
-/** redirect_to se guarda como path relativo (p. ej. /tiendas/slug?tab=…); new URL(path) sin base falla. */
-function resolveSafeRedirect(origin: string, redirectTo: string): URL {
-    const base = new URL(origin);
-    const trimmed = redirectTo.trim();
-    if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
-        return new URL("/tiendas", base);
-    }
-    const target = new URL(trimmed, base);
-    if (target.origin !== base.origin) {
-        return new URL("/tiendas", base);
-    }
-    return target;
+async function loadStateRow(state: string) {
+    const admin = createAdminClient();
+    return admin
+        .from("mp_oauth_states")
+        .select("state, negocio_id, requested_by, redirect_to, expires_at, code_verifier")
+        .eq("state", state)
+        .maybeSingle();
 }
 
 export async function GET(request: NextRequest) {
@@ -26,9 +27,28 @@ export async function GET(request: NextRequest) {
     const postOrigin = getMercadoPagoOAuthPostConsentOrigin(url);
     const code = url.searchParams.get("code")?.trim();
     const state = url.searchParams.get("state")?.trim();
+    const mpError = url.searchParams.get("error")?.trim();
 
-    if (!code) return badRequest("Falta code");
-    if (!state) return badRequest("Falta state");
+    if (mpError && !code) {
+        let redirectTo: string | null = null;
+        if (state) {
+            const { data: stateRow } = await loadStateRow(state);
+            redirectTo = stateRow?.redirect_to ?? null;
+            if (stateRow?.state) {
+                const admin = createAdminClient();
+                await admin.from("mp_oauth_states").delete().eq("state", state);
+            }
+        }
+        const errCode = mpError === "access_denied" ? "cancelado" : "falta_autorizacion";
+        return redirectWithError(postOrigin, redirectTo, errCode);
+    }
+
+    if (!code) {
+        return redirectWithError(postOrigin, null, "falta_autorizacion");
+    }
+    if (!state) {
+        return redirectWithError(postOrigin, null, "estado_invalido");
+    }
 
     const admin = createAdminClient();
     const { data: stateRow, error: stateErr } = await admin
@@ -37,12 +57,14 @@ export async function GET(request: NextRequest) {
         .eq("state", state)
         .maybeSingle();
     if (stateErr || !stateRow) {
-        return NextResponse.json({ error: "Estado inválido o expirado" }, { status: 400 });
+        return redirectWithError(postOrigin, null, "estado_invalido");
     }
+
+    const redirectTo = stateRow.redirect_to;
 
     if (new Date(stateRow.expires_at).getTime() < Date.now()) {
         await admin.from("mp_oauth_states").delete().eq("state", state);
-        return NextResponse.json({ error: "Estado expirado" }, { status: 400 });
+        return redirectWithError(postOrigin, redirectTo, "estado_expirado");
     }
 
     try {
@@ -64,18 +86,14 @@ export async function GET(request: NextRequest) {
             { onConflict: "negocio_id" },
         );
         if (upsertErr) {
-            return NextResponse.json({ error: upsertErr.message }, { status: 500 });
+            return redirectWithError(postOrigin, redirectTo, "guardado_fallido");
         }
 
         await admin.from("mp_oauth_states").delete().eq("state", state);
 
-        const redirectTo = stateRow.redirect_to?.trim();
-        if (redirectTo) {
-            return NextResponse.redirect(resolveSafeRedirect(postOrigin, redirectTo));
-        }
-        return NextResponse.redirect(new URL("/tiendas", postOrigin));
-    } catch (e) {
-        const message = e instanceof Error ? e.message : "OAuth error";
-        return NextResponse.json({ error: message }, { status: 502 });
+        const successTarget = buildOAuthCallbackRedirect(postOrigin, redirectTo, { kind: "ok" });
+        return NextResponse.redirect(successTarget);
+    } catch {
+        return redirectWithError(postOrigin, redirectTo, "intercambio_fallido");
     }
 }
