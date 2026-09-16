@@ -5,7 +5,6 @@ import { isSubscriptionEnforcementEnabled } from "@/lib/auth/user-subscription";
 const SUBSCRIPTION_PAYWALL_EXEMPT_PREFIXES = [
   "/auth",
   "/mercadopago/retorno",
-  "/perfil",
   SUBSCRIPTION_PAYWALL_PATH,
 ] as const;
 

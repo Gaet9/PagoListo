@@ -10,6 +10,9 @@ export type SaasAbonoPlan = {
 
 const DEFAULT_PLAN_CODE: SaasAbonoPlanCode = "mensual";
 
+/** Valor típico de prueba / placeholder en deploys; no usar como precio real en UI ni Checkout. */
+const PLACEHOLDER_MONTHLY_ARS = 100;
+
 function parsePositiveArs(raw: string | undefined, envName: string): number {
   const trimmed = raw?.trim();
   if (!trimmed) {
@@ -18,6 +21,11 @@ function parsePositiveArs(raw: string | undefined, envName: string): number {
   const value = Number(trimmed);
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`${envName} must be a positive number.`);
+  }
+  if (value === PLACEHOLDER_MONTHLY_ARS) {
+    throw new Error(
+      `${envName}=${PLACEHOLDER_MONTHLY_ARS} parece un placeholder de prueba. Configurá el precio mensual real (p. ej. 9990 ARS en producción).`,
+    );
   }
   return value;
 }
