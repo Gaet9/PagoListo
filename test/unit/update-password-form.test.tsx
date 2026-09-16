@@ -7,6 +7,7 @@ import { UpdatePasswordForm } from "@/components/update-password-form";
 const getUserMock = vi.fn();
 const updateUserMock = vi.fn();
 const onAuthStateChangeMock = vi.fn();
+const exchangeCodeForSessionMock = vi.fn();
 
 const pushMock = vi.fn();
 
@@ -20,6 +21,10 @@ vi.mock("@/lib/supabase/client", () => ({
       getUser: (...args: unknown[]) => getUserMock(...args),
       updateUser: (...args: unknown[]) => updateUserMock(...args),
       onAuthStateChange: (...args: unknown[]) => onAuthStateChangeMock(...args),
+      exchangeCodeForSession: (...args: unknown[]) =>
+        exchangeCodeForSessionMock(...args),
+      verifyOtp: vi.fn(),
+      setSession: vi.fn(),
     },
   }),
 }));
@@ -29,6 +34,8 @@ describe("UpdatePasswordForm", () => {
     getUserMock.mockReset();
     updateUserMock.mockReset();
     onAuthStateChangeMock.mockReset();
+    exchangeCodeForSessionMock.mockReset();
+    exchangeCodeForSessionMock.mockResolvedValue({ error: null });
     onAuthStateChangeMock.mockReturnValue({
       data: { subscription: { unsubscribe: vi.fn() } },
     });
@@ -49,6 +56,27 @@ describe("UpdatePasswordForm", () => {
     expect(
       screen.getByRole("button", { name: /guardar contraseña/i }),
     ).toBeDisabled();
+  });
+
+  it("establece sesión desde code en la URL y habilita el formulario", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/update-password?code=from-email",
+    );
+    getUserMock.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+
+    render(<UpdatePasswordForm />);
+
+    await waitFor(() => {
+      expect(exchangeCodeForSessionMock).toHaveBeenCalledWith("from-email");
+      expect(
+        screen.getByRole("button", { name: /guardar contraseña/i }),
+      ).not.toBeDisabled();
+    });
   });
 
   it("actualiza la contraseña cuando hay sesión", async () => {
