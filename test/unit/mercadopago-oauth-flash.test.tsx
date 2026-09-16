@@ -18,6 +18,7 @@ describe("MercadoPagoOAuthFlashBanner", () => {
         window.history.pushState({}, "", "/tiendas/foo?tab=configuracion&mp_oauth=ok");
         render(<MercadoPagoOAuthFlashBanner />);
         expect(screen.getByRole("status")).toHaveTextContent(/vinculado/i);
+        expect(screen.getByRole("link", { name: /Ir a Cobrar/i })).toHaveAttribute("href", "?tab=cobrar");
     });
 
     it("muestra error recuperable", () => {

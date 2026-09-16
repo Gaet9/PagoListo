@@ -4,8 +4,10 @@ import { createClient } from "@/lib/supabase/client";
 import { listProductos } from "@/lib/queries/productos";
 import type { ProductoRow } from "@/lib/types/negocio";
 import { BarcodeScannerDialog } from "@/components/tienda/barcode-scanner-dialog";
+import { MercadoPagoOAuthStatusBanner } from "@/components/tienda/mercadopago-oauth-status-banner";
 import { MercadoPagoQr } from "@/components/tienda/mercadopago-qr";
 import { buildMercadoPagoOAuthStartPath } from "@/lib/mercadopago/oauth-start-url";
+import { mercadoPagoOAuthStatusErrorMessage } from "@/lib/mercadopago/fetch-oauth-status-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -47,6 +49,8 @@ export function CobrarTab({ negocioId }: Props) {
     const [qrError, setQrError] = useState<string | null>(null);
     const [qrInitPoint, setQrInitPoint] = useState<string | null>(null);
     const [qrIntentoId, setQrIntentoId] = useState<string | null>(null);
+    const [oauthReturnPath, setOauthReturnPath] = useState("/tiendas?tab=cobrar");
+    const [configuracionHref, setConfiguracionHref] = useState("/tiendas?tab=configuracion");
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -66,6 +70,16 @@ export function CobrarTab({ negocioId }: Props) {
     useEffect(() => {
         load();
     }, [load]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const cobrarParams = new URLSearchParams(window.location.search);
+        cobrarParams.set("tab", "cobrar");
+        setOauthReturnPath(`${window.location.pathname}?${cobrarParams.toString()}`);
+        const configParams = new URLSearchParams(window.location.search);
+        configParams.set("tab", "configuracion");
+        setConfiguracionHref(`${window.location.pathname}?${configParams.toString()}`);
+    }, []);
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -133,7 +147,7 @@ export function CobrarTab({ negocioId }: Props) {
                 });
                 const statusJson = (await statusRes.json().catch(() => ({}))) as { connected?: boolean; error?: string };
                 if (!statusRes.ok) {
-                    throw new Error(statusJson.error || `Error ${statusRes.status}`);
+                    throw new Error(mercadoPagoOAuthStatusErrorMessage(statusRes.status, statusJson.error));
                 }
 
                 const connected = !!statusJson.connected;
@@ -263,6 +277,13 @@ export function CobrarTab({ negocioId }: Props) {
                     Registrá ventas en el mostrador: buscá productos, armá el carrito y elegí el medio de pago.
                 </p>
             </div>
+
+            <MercadoPagoOAuthStatusBanner
+                negocioId={negocioId}
+                oauthReturnPath={oauthReturnPath}
+                configuracionHref={configuracionHref}
+                variant='cobrar'
+            />
 
             <section className='rounded-lg border bg-card p-4 flex flex-col gap-3'>
                 <div className='flex items-start justify-between gap-3'>

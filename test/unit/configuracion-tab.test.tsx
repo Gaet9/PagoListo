@@ -47,6 +47,7 @@ describe("ConfiguracionTab", () => {
             expect(screen.getByText("kiosco@example.com")).toBeInTheDocument();
         });
         expect(screen.getByText(/99/)).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: /Cambiar cuenta/i })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Vincular otra cuenta/i })).toBeInTheDocument();
+        expect(screen.getByText("Vinculada")).toBeInTheDocument();
     });
 });

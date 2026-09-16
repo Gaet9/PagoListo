@@ -37,7 +37,7 @@ describe("NegocioMercadoPagoStatus", () => {
         render(<NegocioMercadoPagoStatus negocioId='n1' configuracionHref='/tiendas/foo?tab=configuracion' />);
 
         await waitFor(() => {
-            expect(screen.getByText(/Vinculado para cobrar/i)).toBeInTheDocument();
+            expect(screen.getByText("Vinculada")).toBeInTheDocument();
         });
         expect(screen.getByText("seller@example.com")).toBeInTheDocument();
         expect(screen.getByText(/3349768256/)).toBeInTheDocument();
@@ -58,7 +58,7 @@ describe("NegocioMercadoPagoStatus", () => {
         render(<NegocioMercadoPagoStatus negocioId='n1' configuracionHref='/tiendas/foo?tab=configuracion' />);
 
         await waitFor(() => {
-            expect(screen.getByRole("button", { name: /Conectar Mercado Pago/i })).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: /Conectar con Mercado Pago/i })).toBeInTheDocument();
         });
     });
 });

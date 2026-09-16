@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { parseMpOAuthFlashFromSearchParams, stripMpOAuthFlashParams, type MpOAuthFlash } from "@/lib/mercadopago/oauth-return";
@@ -36,7 +37,12 @@ export function MercadoPagoOAuthFlashBanner({ className }: Props) {
                     "rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground"
                 }>
                 <p className='font-medium'>Mercado Pago vinculado</p>
-                <p className='mt-0.5 text-muted-foreground'>Ya podés cobrar con QR en la pestaña Cobrar.</p>
+                <p className='mt-0.5 text-muted-foreground'>Ya podés cobrar con QR en el mostrador.</p>
+                <p className='mt-2'>
+                    <Link href='?tab=cobrar' className='text-sm font-medium text-primary underline-offset-4 hover:underline'>
+                        Ir a Cobrar
+                    </Link>
+                </p>
             </div>
         );
     }
