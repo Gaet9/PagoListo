@@ -34,15 +34,16 @@ El código detallado va en `mp_oauth_error`. Todos son **recuperables**: volvé 
 2. **Perfil** — resumen por negocio y botón «Conectar Mercado Pago» (vuelve a Perfil al terminar).
 3. **Cobrar → Mercado Pago (QR)** — si falta la cuenta, botón directo (vuelve a **Cobrar** al terminar).
 
-## Desvincular (API server — GAE-8 / GAE-37 UI)
+## Desvincular (API server — GAE-8 / GAE-37 UI, PR #25)
 
 Solo rutas server; nunca borrar tokens desde supabase-js en el navegador.
 
-| Método | Ruta | Body / query |
-| ------ | ---- | ------------- |
-| `POST` | `/api/mercadopago/oauth/disconnect?negocioId=<uuid>` | Opcional JSON `{ "negocioId": "<uuid>" }` |
-| `DELETE` | `/api/mercadopago/oauth/disconnect?negocioId=<uuid>` | Mismo query |
+| Método | Ruta | Body |
+| ------ | ---- | ---- |
+| `POST` | `/api/mercadopago/oauth/unlink` | `{ "negocioId": "<uuid>" }` |
 
-Respuesta segura (sin tokens): `{ "connected": false, "disconnected": true }` o `{ "connected": false, "disconnected": false, "already_disconnected": true }`.
+Constante compartida con el cliente UI: `MERCADOPAGO_OAUTH_UNLINK_API_PATH` en `lib/mercadopago/oauth-unlink-endpoint.ts`.
+
+Respuesta segura (sin tokens): `{ "ok": true }` con HTTP 200 (también si ya estaba desvinculado).
 
 Re-vincular: `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…` (nuevo state + PKCE; filas locales ya borradas).
