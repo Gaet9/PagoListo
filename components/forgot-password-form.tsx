@@ -13,17 +13,42 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { getForgotPasswordErrorMessage } from "@/lib/auth/forgot-password-error-message";
+import {
+  FORGOT_PASSWORD_SENT_SEARCH_PARAM,
+  markForgotPasswordEmailRequested,
+  readForgotPasswordEmailRequestedFromSession,
+} from "@/lib/auth/forgot-password-sent-state";
+
+type ForgotPasswordFormProps = React.ComponentPropsWithoutRef<"div"> & {
+  /** Éxito persistido vía `?sent=1` (sobrevive remounts por refresh de sesión). */
+  sentFromUrl?: boolean;
+};
 
 export function ForgotPasswordForm({
   className,
+  sentFromUrl = false,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: ForgotPasswordFormProps) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState(sentFromUrl);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (sentFromUrl) return;
+    if (!readForgotPasswordEmailRequestedFromSession()) return;
+    setSuccess(true);
+    router.replace(
+      `/auth/forgot-password?${FORGOT_PASSWORD_SENT_SEARCH_PARAM}=1`,
+      { scroll: false },
+    );
+  }, [router, sentFromUrl]);
+
+  const showSuccess = success || sentFromUrl;
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +61,12 @@ export function ForgotPasswordForm({
         redirectTo: `${window.location.origin}/auth/update-password`,
       });
       if (error) throw error;
+      markForgotPasswordEmailRequested();
       setSuccess(true);
+      router.replace(
+        `/auth/forgot-password?${FORGOT_PASSWORD_SENT_SEARCH_PARAM}=1`,
+        { scroll: false },
+      );
     } catch (error: unknown) {
       setError(getForgotPasswordErrorMessage(error));
     } finally {
@@ -46,7 +76,7 @@ export function ForgotPasswordForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      {success ? (
+      {showSuccess ? (
         <Card>
           <CardHeader>
             <CardTitle>Revisá tu correo si tenés cuenta</CardTitle>
