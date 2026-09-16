@@ -17,7 +17,7 @@ export type MercadoPagoPaymentForAbono = {
   preference_id?: string | null;
   external_reference?: string | null;
   transaction_amount?: number;
-  metadata?: { intento_id?: string; kind?: string };
+  metadata?: { intento_id?: string; kind?: string; usuario_id?: string };
 };
 
 export function resolveSaasAbonoIntentoLookupId(payment: MercadoPagoPaymentForAbono): string | null {
@@ -84,6 +84,12 @@ export async function processSaasAbonoApprovedPayment(
 
   if (intento.consumed_at || intento.mp_payment_id) {
     return { handled: true, reason: "already_consumed" };
+  }
+
+  const metadataUsuarioId =
+    typeof payment.metadata?.usuario_id === "string" ? payment.metadata.usuario_id.trim() : null;
+  if (metadataUsuarioId && metadataUsuarioId !== intento.usuario_id) {
+    return { handled: true, reason: "usuario_mismatch" };
   }
 
   if (preferenceId && intento.mp_preference_id !== preferenceId) {
