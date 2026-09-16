@@ -52,6 +52,20 @@ describe("isActiveSubscription", () => {
       ),
     ).toBe(false);
   });
+
+  it("is true when canceled but period not ended", () => {
+    expect(
+      isActiveSubscription(
+        {
+          status: "canceled",
+          current_period_end: "2026-07-01T00:00:00.000Z",
+          plan_code: "mensual",
+          canceled_at: "2026-06-01T00:00:00.000Z",
+        },
+        now,
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("computeNextSubscriptionPeriodEnd", () => {

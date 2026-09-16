@@ -3,11 +3,17 @@ import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
 
 import { SuscripcionAbonoCheckout } from "@/components/perfil/suscripcion-abono-checkout";
+import { SuscripcionCancelButton } from "@/components/perfil/suscripcion-cancel-button";
+import {
+  subscriptionAllowsCancel,
+  subscriptionAllowsCheckout,
+  SuscripcionEstadoResumen,
+} from "@/components/perfil/suscripcion-estado-resumen";
 import { PageShell } from "@/components/ui/page-shell";
 import {
   fetchUserSubscription,
-  isActiveSubscription,
   isSubscriptionEnforcementEnabled,
+  resolveSubscriptionUiPhase,
 } from "@/lib/auth/user-subscription";
 import { resolveSaasAbonoPlan } from "@/lib/mercadopago/saas-abono-plan";
 import { createClient } from "@/lib/supabase/server";
@@ -31,7 +37,8 @@ async function PerfilSubscripcionesContent({
   }
 
   const row = await fetchUserSubscription(supabase, auth.user.id);
-  const active = isActiveSubscription(row);
+  const phase = resolveSubscriptionUiPhase(row);
+  const enforcement = isSubscriptionEnforcementEnabled();
 
   let amountLabel = "—";
   let checkoutEnabled = false;
@@ -43,40 +50,35 @@ async function PerfilSubscripcionesContent({
     amountLabel = "Configurá PAGOLISTO_SAAS_PLAN_MENSUAL_ARS en el servidor";
   }
 
-  const enforcement = isSubscriptionEnforcementEnabled();
+  const accessUntilLabel =
+    row?.current_period_end ?
+      new Date(row.current_period_end).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" })
+    : "el fin del período vigente";
 
   return (
     <PageShell surface="card" padding="md" rounded="lg" className="space-y-4">
-      {requiereAbono && enforcement && !active ? (
+      {requiereAbono && enforcement && phase !== "active" && phase !== "canceled_until_end" ? (
         <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
-          Para usar <strong>Mi tienda</strong> necesitás un abono activo. Completá el pago abajo o volvé cuando el
+          Para usar <strong>PagoListo</strong> necesitás un abono activo. Completá el pago abajo o volvé cuando el
           período esté vigente.
         </div>
       ) : null}
 
-      {active ? (
-        <div className="text-sm space-y-1">
-          <div>
-            Estado: <span className="font-medium text-foreground">Activo</span>
-            {row?.plan_code ? <span className="text-muted-foreground"> ({row.plan_code})</span> : null}
-          </div>
-          {row?.current_period_end ? (
-            <div className="text-xs text-muted-foreground">
-              Vigente hasta: {new Date(row.current_period_end).toLocaleString("es-AR")}
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          {enforcement ?
-            "Contratá el abono mensual para acceder a la gestión de tu comercio en PagoListo."
-          : "El paywall está desactivado en este entorno (PAGOLISTO_SUBSCRIPTION_ENFORCE=false)."}
-        </p>
-      )}
+      <SuscripcionEstadoResumen row={row} enforcementEnabled={enforcement} />
 
-      {!active ?
+      {subscriptionAllowsCheckout(row) ?
         <SuscripcionAbonoCheckout amountLabel={amountLabel} disabled={!checkoutEnabled} />
       : null}
+
+      {subscriptionAllowsCancel(row) ?
+        <SuscripcionCancelButton accessUntilLabel={accessUntilLabel} />
+      : null}
+
+      <p className="text-xs text-muted-foreground">
+        El abono es un pago mensual único vía Mercado Pago (Checkout Pro). En sandbox usá cuentas de prueba; en
+        producción configurá <code className="tutorial-code">MERCADOPAGO_ACCESS_TOKEN_SAAS</code> y el webhook en tu
+        URL pública (<code className="tutorial-code">/api/mercadopago/webhook</code>).
+      </p>
     </PageShell>
   );
 }

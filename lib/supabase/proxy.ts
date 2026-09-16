@@ -2,6 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getSafeInternalNextPath } from "@/lib/auth/safe-next-path";
+import {
+  shouldEnforceSubscriptionPaywall,
+  subscriptionPaywallRedirectUrl,
+} from "@/lib/auth/subscription-paywall-paths";
+import { userHasActiveSubscription } from "@/lib/auth/user-subscription";
 import { hasEnvVars } from "../has-env-vars";
 
 export async function updateSession(request: NextRequest) {
@@ -62,6 +67,22 @@ export async function updateSession(request: NextRequest) {
         url.search = "";
         url.searchParams.set("next", next);
         return NextResponse.redirect(url);
+    }
+
+    const userId = typeof user?.sub === "string" ? user.sub : null;
+    if (
+        userId &&
+        shouldEnforceSubscriptionPaywall(request.nextUrl.pathname, true)
+    ) {
+        const hasAccess = await userHasActiveSubscription(supabase, userId);
+        if (!hasAccess) {
+            const paywallUrl = subscriptionPaywallRedirectUrl(request.nextUrl);
+            const redirectResponse = NextResponse.redirect(paywallUrl);
+            for (const cookie of supabaseResponse.cookies.getAll()) {
+                redirectResponse.cookies.set(cookie);
+            }
+            return redirectResponse;
+        }
     }
 
     // IMPORTANT: You *must* return the supabaseResponse object as it is.

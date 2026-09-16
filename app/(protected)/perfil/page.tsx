@@ -7,6 +7,7 @@ import { CrearTiendaEnPerfil } from "@/components/perfil/crear-tienda-en-perfil"
 import { EliminarNegocioDialog } from "@/components/perfil/eliminar-negocio-dialog";
 import { NegocioMercadoPagoStatus } from "@/components/perfil/negocio-mercadopago-status";
 import { CambiarContrasenaPerfilCard } from "@/components/perfil/cambiar-contrasena-perfil-card";
+import { SuscripcionEstadoResumen } from "@/components/perfil/suscripcion-estado-resumen";
 import { UsuarioPerfilForm } from "@/components/perfil/usuario-perfil-form";
 import {
     Breadcrumb,
@@ -21,6 +22,7 @@ import { PageShell } from "@/components/ui/page-shell";
 import { buildNegocioSlug } from "@/lib/negocio-slug";
 import { listNegocios } from "@/lib/queries/negocios";
 import { getUsuarioPerfil } from "@/lib/queries/usuarios";
+import { fetchUserSubscription, isSubscriptionEnforcementEnabled } from "@/lib/auth/user-subscription";
 import { createClient } from "@/lib/supabase/server";
 import { Loader2 } from "lucide-react";
 
@@ -31,9 +33,11 @@ async function PerfilContent() {
         redirect("/auth/login");
     }
 
-    const [{ data: usuario, error: usuarioErr }, { data: negocios, error: negErr }] = await Promise.all([
+    const [{ data: usuario, error: usuarioErr }, { data: negocios, error: negErr }, subscriptionRow] =
+        await Promise.all([
         getUsuarioPerfil(supabase, auth.user.id),
         listNegocios(supabase),
+        fetchUserSubscription(supabase, auth.user.id),
     ]);
 
     if (usuarioErr || !usuario) {
@@ -78,7 +82,7 @@ async function PerfilContent() {
 
             <CambiarContrasenaPerfilCard email={usuario.email} />
 
-            <PageShell as='section' surface='card' padding='md' rounded='lg'>
+            <PageShell as='section' surface='card' padding='md' rounded='lg' className='space-y-3'>
                 <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
                     <div className='min-w-0'>
                         <h2>Suscripción</h2>
@@ -88,6 +92,7 @@ async function PerfilContent() {
                         <Link href='/perfil/subscripciones'>Ver suscripción</Link>
                     </Button>
                 </div>
+                <SuscripcionEstadoResumen row={subscriptionRow} enforcementEnabled={isSubscriptionEnforcementEnabled()} />
             </PageShell>
 
             <PageShell as='section' surface='card' padding='md' rounded='lg'>

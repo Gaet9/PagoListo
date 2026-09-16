@@ -4,9 +4,27 @@ export type UserSubscriptionRow = {
   status: string;
   current_period_end: string | null;
   plan_code: string | null;
+  canceled_at?: string | null;
 };
 
-export const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active"]);
+/** Estados que mantienen acceso hasta `current_period_end`. */
+export const SUBSCRIPTION_ACCESS_STATUSES = new Set(["active", "canceled"]);
+
+export type SubscriptionUiPhase = "none" | "active" | "canceled_until_end" | "expired";
+
+export function resolveSubscriptionUiPhase(
+  row: UserSubscriptionRow | null | undefined,
+  now = new Date(),
+): SubscriptionUiPhase {
+  if (!row) return "none";
+  if (isActiveSubscription(row, now)) {
+    return row.status === "canceled" ? "canceled_until_end" : "active";
+  }
+  if (!row.current_period_end && (row.status === "inactive" || row.status === "past_due")) {
+    return "none";
+  }
+  return "expired";
+}
 
 /** Si es false, el paywall no bloquea (útil en dev local). En producción debe ser true. */
 export function isSubscriptionEnforcementEnabled(): boolean {
@@ -19,7 +37,7 @@ export function isSubscriptionEnforcementEnabled(): boolean {
 
 export function isActiveSubscription(row: UserSubscriptionRow | null | undefined, now = new Date()): boolean {
   if (!row) return false;
-  if (!ACTIVE_SUBSCRIPTION_STATUSES.has(row.status)) return false;
+  if (!SUBSCRIPTION_ACCESS_STATUSES.has(row.status)) return false;
   if (!row.current_period_end) return false;
   const end = new Date(row.current_period_end);
   if (Number.isNaN(end.getTime())) return false;
@@ -41,7 +59,7 @@ export async function fetchUserSubscription(
 ): Promise<UserSubscriptionRow | null> {
   const { data, error } = await supabase
     .from("suscripciones_usuario")
-    .select("status, current_period_end, plan_code")
+    .select("status, current_period_end, plan_code, canceled_at")
     .eq("user_id", userId)
     .maybeSingle<UserSubscriptionRow>();
 
