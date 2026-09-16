@@ -54,9 +54,7 @@ describe("ForgotPasswordForm", () => {
     expect(resetPasswordForEmailMock).toHaveBeenCalledWith(
       "usuario@ejemplo.com",
       {
-        redirectTo: expect.stringMatching(
-          /\/auth\/callback\?next=%2Fauth%2Fupdate-password$/,
-        ),
+        redirectTo: expect.stringMatching(/\/auth\/update-password$/),
       },
     );
 

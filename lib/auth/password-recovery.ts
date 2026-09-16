@@ -2,10 +2,9 @@ import { getSafeInternalNextPath } from "@/lib/auth/safe-next-path";
 
 export const PASSWORD_RECOVERY_UPDATE_PATH = "/auth/update-password";
 
-/** `redirectTo` para `resetPasswordForEmail` (intercambio PKCE en `/auth/callback`). */
+/** `redirectTo` para `resetPasswordForEmail` (ruta allow-listed; el intercambio PKCE ocurre en el cliente). */
 export function buildPasswordRecoveryRedirectTo(origin: string): string {
-  const next = encodeURIComponent(PASSWORD_RECOVERY_UPDATE_PATH);
-  return `${origin.replace(/\/$/, "")}/auth/callback?next=${next}`;
+  return `${origin.replace(/\/$/, "")}${PASSWORD_RECOVERY_UPDATE_PATH}`;
 }
 
 /**

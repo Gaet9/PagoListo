@@ -7,9 +7,12 @@ import {
 } from "@/lib/auth/password-recovery";
 
 describe("password-recovery", () => {
-  it("buildPasswordRecoveryRedirectTo apunta al callback con next", () => {
+  it("buildPasswordRecoveryRedirectTo apunta a update-password sin query", () => {
     expect(buildPasswordRecoveryRedirectTo("https://app.test")).toBe(
-      "https://app.test/auth/callback?next=%2Fauth%2Fupdate-password",
+      "https://app.test/auth/update-password",
+    );
+    expect(buildPasswordRecoveryRedirectTo("https://app.test/")).toBe(
+      "https://app.test/auth/update-password",
     );
   });
 
