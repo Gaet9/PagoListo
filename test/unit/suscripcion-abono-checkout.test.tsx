@@ -22,6 +22,11 @@ describe("SuscripcionAbonoCheckout", () => {
     );
   });
 
+  it("enables Pagar when amount label is set (e.g. QA 100 ARS)", () => {
+    render(<SuscripcionAbonoCheckout amountLabel="$ 100,00" />);
+    expect(screen.getByRole("button", { name: /pagar abono/i })).toBeEnabled();
+  });
+
   it("starts checkout with server-side plan body", async () => {
     render(<SuscripcionAbonoCheckout amountLabel="$ 4.999,00" />);
     fireEvent.click(screen.getByRole("button", { name: /pagar abono/i }));
