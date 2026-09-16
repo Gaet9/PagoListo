@@ -33,12 +33,13 @@ async function PerfilContent() {
         redirect("/auth/login");
     }
 
-    const [{ data: usuario, error: usuarioErr }, { data: negocios, error: negErr }, subscriptionRow] =
+    const [{ data: usuario, error: usuarioErr }, { data: negocios, error: negErr }, subscriptionFetch] =
         await Promise.all([
         getUsuarioPerfil(supabase, auth.user.id),
         listNegocios(supabase),
         fetchUserSubscription(supabase, auth.user.id),
     ]);
+    const subscriptionRow = subscriptionFetch.error ? null : subscriptionFetch.row;
 
     if (usuarioErr || !usuario) {
         return (
@@ -92,7 +93,11 @@ async function PerfilContent() {
                         <Link href='/perfil/subscripciones'>Ver suscripción</Link>
                     </Button>
                 </div>
-                <SuscripcionEstadoResumen row={subscriptionRow} enforcementEnabled={isSubscriptionEnforcementEnabled()} />
+                {subscriptionFetch.error ?
+                    <p className="text-sm text-destructive">
+                        No se pudo cargar el estado de tu suscripción: {subscriptionFetch.error}
+                    </p>
+                :   <SuscripcionEstadoResumen row={subscriptionRow} enforcementEnabled={isSubscriptionEnforcementEnabled()} />}
             </PageShell>
 
             <PageShell as='section' surface='card' padding='md' rounded='lg'>

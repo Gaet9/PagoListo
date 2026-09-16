@@ -53,6 +53,11 @@ export function computeNextSubscriptionPeriodEnd(existingPeriodEnd: Date | null,
   return next;
 }
 
+export type UserSubscriptionFetchResult = {
+  row: UserSubscriptionRow | null;
+  error: string | null;
+};
+
 const SUBSCRIPTION_ROW_SELECT_FULL =
   "status, current_period_end, plan_code, canceled_at" as const;
 const SUBSCRIPTION_ROW_SELECT_CORE = "status, current_period_end" as const;
@@ -71,45 +76,59 @@ function subscriptionRowFromCore(
 export async function fetchUserSubscription(
   supabase: SupabaseClient,
   userId: string,
-): Promise<UserSubscriptionRow | null> {
-  const { data, error } = await supabase
-    .from("suscripciones_usuario")
-    .select(SUBSCRIPTION_ROW_SELECT_FULL)
-    .eq("user_id", userId)
-    .maybeSingle<UserSubscriptionRow>();
+): Promise<UserSubscriptionFetchResult> {
+  try {
+    const { data, error } = await supabase
+      .from("suscripciones_usuario")
+      .select(SUBSCRIPTION_ROW_SELECT_FULL)
+      .eq("user_id", userId)
+      .maybeSingle<UserSubscriptionRow>();
 
-  if (!error) {
-    return data ?? null;
+    if (!error) {
+      return { row: data ?? null, error: null };
+    }
+
+    const isMissingColumn =
+      /column.+does not exist/i.test(error.message) ||
+      error.code === "42703" ||
+      error.code === "PGRST204";
+
+    if (!isMissingColumn) {
+      return { row: null, error: error.message };
+    }
+
+    const fallback = await supabase
+      .from("suscripciones_usuario")
+      .select(SUBSCRIPTION_ROW_SELECT_CORE)
+      .eq("user_id", userId)
+      .maybeSingle<{ status: string; current_period_end: string | null }>();
+
+    if (fallback.error) {
+      return { row: null, error: fallback.error.message };
+    }
+
+    return {
+      row: fallback.data ? subscriptionRowFromCore(fallback.data) : null,
+      error: null,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error al cargar la suscripción";
+    return { row: null, error: message };
   }
-
-  const isMissingColumn =
-    /column.+does not exist/i.test(error.message) ||
-    error.code === "42703" ||
-    error.code === "PGRST204";
-
-  if (!isMissingColumn) {
-    console.error("[fetchUserSubscription]", error.message);
-    return null;
-  }
-
-  const fallback = await supabase
-    .from("suscripciones_usuario")
-    .select(SUBSCRIPTION_ROW_SELECT_CORE)
-    .eq("user_id", userId)
-    .maybeSingle<{ status: string; current_period_end: string | null }>();
-
-  if (fallback.error) {
-    console.error("[fetchUserSubscription]", fallback.error.message);
-    return null;
-  }
-
-  return fallback.data ? subscriptionRowFromCore(fallback.data) : null;
 }
 
+/** Paywall / middleware: nunca lanzar; ante error de verificación, tratar como sin abono activo. */
 export async function userHasActiveSubscription(supabase: SupabaseClient, userId: string): Promise<boolean> {
   if (!isSubscriptionEnforcementEnabled()) {
     return true;
   }
-  const row = await fetchUserSubscription(supabase, userId);
-  return isActiveSubscription(row);
+  try {
+    const { row, error } = await fetchUserSubscription(supabase, userId);
+    if (error) {
+      return false;
+    }
+    return isActiveSubscription(row);
+  } catch {
+    return false;
+  }
 }

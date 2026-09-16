@@ -11,9 +11,11 @@ import { requirePaidUser, SUBSCRIPTION_PAYWALL_PATH } from "@/lib/auth/require-p
 function createSupabaseMock({
   hasClaims,
   subscription,
+  subscriptionError,
 }: {
   hasClaims: boolean;
   subscription?: { status: string; current_period_end: string | null; plan_code: string | null } | null;
+  subscriptionError?: string | null;
 }): SupabaseClient {
   return {
     auth: {
@@ -30,7 +32,7 @@ function createSupabaseMock({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
               data: subscription ?? null,
-              error: null,
+              error: subscriptionError ? { message: subscriptionError } : null,
             }),
           }),
         }),
@@ -79,6 +81,19 @@ describe("requirePaidUser", () => {
     const res = await requirePaidUser(supabase);
     expect(redirect).not.toHaveBeenCalled();
     expect(res.userId).toBe("u1");
+  });
+
+  it("returns subscription load error without redirect when query fails", async () => {
+    const supabase = createSupabaseMock({
+      hasClaims: true,
+      subscriptionError: "column canceled_at does not exist",
+    });
+    const res = await requirePaidUser(supabase);
+    expect(redirect).not.toHaveBeenCalled();
+    expect(res).toEqual({
+      userId: "u1",
+      subscriptionLoadError: "column canceled_at does not exist",
+    });
   });
 
   it("skips paywall when enforcement is disabled", async () => {
