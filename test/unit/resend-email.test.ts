@@ -4,6 +4,7 @@ import {
   RESEND_FALLBACK_FROM,
   getResendApiKey,
   getResendFromAddress,
+  resolveResendFromAddress,
 } from "@/lib/email/resend-config";
 
 describe("resend email env", () => {
@@ -49,5 +50,11 @@ describe("resend email env", () => {
     vi.stubEnv("NODE_ENV", "production");
     delete process.env.RESEND_FROM;
     expect(() => getResendFromAddress()).toThrow(/RESEND_FROM/);
+  });
+
+  it("resolveResendFromAddress returns null in production when RESEND_FROM is missing", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    delete process.env.RESEND_FROM;
+    expect(resolveResendFromAddress()).toBeNull();
   });
 });

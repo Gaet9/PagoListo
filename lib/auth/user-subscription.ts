@@ -53,20 +53,57 @@ export function computeNextSubscriptionPeriodEnd(existingPeriodEnd: Date | null,
   return next;
 }
 
+const SUBSCRIPTION_ROW_SELECT_FULL =
+  "status, current_period_end, plan_code, canceled_at" as const;
+const SUBSCRIPTION_ROW_SELECT_CORE = "status, current_period_end" as const;
+
+function subscriptionRowFromCore(
+  row: { status: string; current_period_end: string | null },
+): UserSubscriptionRow {
+  return {
+    status: row.status,
+    current_period_end: row.current_period_end,
+    plan_code: null,
+    canceled_at: null,
+  };
+}
+
 export async function fetchUserSubscription(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<UserSubscriptionRow | null> {
   const { data, error } = await supabase
     .from("suscripciones_usuario")
-    .select("status, current_period_end, plan_code, canceled_at")
+    .select(SUBSCRIPTION_ROW_SELECT_FULL)
     .eq("user_id", userId)
     .maybeSingle<UserSubscriptionRow>();
 
-  if (error) {
-    throw new Error(error.message);
+  if (!error) {
+    return data ?? null;
   }
-  return data ?? null;
+
+  const isMissingColumn =
+    /column.+does not exist/i.test(error.message) ||
+    error.code === "42703" ||
+    error.code === "PGRST204";
+
+  if (!isMissingColumn) {
+    console.error("[fetchUserSubscription]", error.message);
+    return null;
+  }
+
+  const fallback = await supabase
+    .from("suscripciones_usuario")
+    .select(SUBSCRIPTION_ROW_SELECT_CORE)
+    .eq("user_id", userId)
+    .maybeSingle<{ status: string; current_period_end: string | null }>();
+
+  if (fallback.error) {
+    console.error("[fetchUserSubscription]", fallback.error.message);
+    return null;
+  }
+
+  return fallback.data ? subscriptionRowFromCore(fallback.data) : null;
 }
 
 export async function userHasActiveSubscription(supabase: SupabaseClient, userId: string): Promise<boolean> {

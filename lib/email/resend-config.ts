@@ -19,12 +19,19 @@ export function getResendApiKey(): string {
   return key;
 }
 
-export function getResendFromAddress(): string {
+/** Devuelve remitente o null si falta config en producción (no lanza). */
+export function resolveResendFromAddress(): string | null {
   const from = process.env.RESEND_FROM?.trim();
   if (from) return from;
   if (allowsResendFromFallback()) {
     return RESEND_FALLBACK_FROM;
   }
+  return null;
+}
+
+export function getResendFromAddress(): string {
+  const from = resolveResendFromAddress();
+  if (from) return from;
   throw new Error(
     "RESEND_FROM is not set. Add it to your environment for production (e.g. hola@pagolisto.com.ar)."
   );

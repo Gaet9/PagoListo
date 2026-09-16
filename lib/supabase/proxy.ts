@@ -74,14 +74,21 @@ export async function updateSession(request: NextRequest) {
         userId &&
         shouldEnforceSubscriptionPaywall(request.nextUrl.pathname, true)
     ) {
-        const hasAccess = await userHasActiveSubscription(supabase, userId);
-        if (!hasAccess) {
-            const paywallUrl = subscriptionPaywallRedirectUrl(request.nextUrl);
-            const redirectResponse = NextResponse.redirect(paywallUrl);
-            for (const cookie of supabaseResponse.cookies.getAll()) {
-                redirectResponse.cookies.set(cookie);
+        try {
+            const hasAccess = await userHasActiveSubscription(supabase, userId);
+            if (!hasAccess) {
+                const paywallUrl = subscriptionPaywallRedirectUrl(request.nextUrl);
+                const redirectResponse = NextResponse.redirect(paywallUrl);
+                for (const cookie of supabaseResponse.cookies.getAll()) {
+                    redirectResponse.cookies.set(cookie);
+                }
+                return redirectResponse;
             }
-            return redirectResponse;
+        } catch (err) {
+            console.error(
+                "[proxy] subscription paywall check failed",
+                err instanceof Error ? err.message : err,
+            );
         }
     }
 
