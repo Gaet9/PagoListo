@@ -13,9 +13,9 @@ describe("isSubscriptionPaywallExemptPath", () => {
     expect(isSubscriptionPaywallExemptPath("/perfil/subscripciones")).toBe(true);
   });
 
-  it("does not exempt tienda or perfil", () => {
+  it("exempts perfil (CTA de suscripción) but not tiendas", () => {
+    expect(isSubscriptionPaywallExemptPath("/perfil")).toBe(true);
     expect(isSubscriptionPaywallExemptPath("/tiendas")).toBe(false);
-    expect(isSubscriptionPaywallExemptPath("/perfil")).toBe(false);
   });
 });
 
@@ -30,7 +30,7 @@ describe("shouldEnforceSubscriptionPaywall", () => {
   it("enforces for authenticated app routes when enabled", () => {
     process.env.PAGOLISTO_SUBSCRIPTION_ENFORCE = "true";
     expect(shouldEnforceSubscriptionPaywall("/tiendas", true)).toBe(true);
-    expect(shouldEnforceSubscriptionPaywall("/perfil", true)).toBe(true);
+    expect(shouldEnforceSubscriptionPaywall("/perfil", true)).toBe(false);
   });
 
   it("skips when unauthenticated or disabled", () => {

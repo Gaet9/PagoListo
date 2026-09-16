@@ -36,7 +36,7 @@ async function PerfilSubscripcionesContent({
     redirect("/auth/login");
   }
 
-  const row = await fetchUserSubscription(supabase, auth.user.id);
+  const { row, error: subscriptionError } = await fetchUserSubscription(supabase, auth.user.id);
   const phase = resolveSubscriptionUiPhase(row);
   const enforcement = isSubscriptionEnforcementEnabled();
 
@@ -64,7 +64,11 @@ async function PerfilSubscripcionesContent({
         </div>
       ) : null}
 
-      <SuscripcionEstadoResumen row={row} enforcementEnabled={enforcement} />
+      {subscriptionError ?
+        <p className="text-sm text-destructive">
+          No se pudo cargar el estado de tu suscripción: {subscriptionError}
+        </p>
+      :   <SuscripcionEstadoResumen row={row} enforcementEnabled={enforcement} />}
 
       {subscriptionAllowsCheckout(row) ?
         <SuscripcionAbonoCheckout amountLabel={amountLabel} disabled={!checkoutEnabled} />

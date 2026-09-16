@@ -6,7 +6,23 @@ import {
   fetchUserSubscription,
   isActiveSubscription,
   isSubscriptionEnforcementEnabled,
+  userHasActiveSubscription,
 } from "@/lib/auth/user-subscription";
+
+function createSubscriptionSupabaseMock(result: {
+  data: unknown;
+  error: { message: string } | null;
+}): SupabaseClient {
+  return {
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue(result),
+        }),
+      }),
+    })),
+  } as unknown as SupabaseClient;
+}
 
 describe("isSubscriptionEnforcementEnabled", () => {
   const prev = process.env.PAGOLISTO_SUBSCRIPTION_ENFORCE;
@@ -97,13 +113,79 @@ describe("fetchUserSubscription", () => {
     }));
     const supabase = { from } as unknown as SupabaseClient;
 
-    const row = await fetchUserSubscription(supabase, "user-1");
-    expect(row).toEqual({
+    const result = await fetchUserSubscription(supabase, "user-1");
+    expect(result.error).toBeNull();
+    expect(result.row).toEqual({
       status: "active",
       current_period_end: "2099-01-01T00:00:00.000Z",
       plan_code: null,
       canceled_at: null,
     });
+  });
+
+  it("returns error message instead of throwing on query failure", async () => {
+    const supabase = createSubscriptionSupabaseMock({
+      data: null,
+      error: { message: "permission denied for table suscripciones_usuario" },
+    });
+    const result = await fetchUserSubscription(supabase, "u1");
+    expect(result).toEqual({
+      row: null,
+      error: "permission denied for table suscripciones_usuario",
+    });
+  });
+
+  it("returns error when supabase client throws", async () => {
+    const supabase = {
+      from: vi.fn(() => {
+        throw new Error("boom");
+      }),
+    } as unknown as SupabaseClient;
+    const result = await fetchUserSubscription(supabase, "u1");
+    expect(result.row).toBeNull();
+    expect(result.error).toBe("boom");
+  });
+
+  it("returns row when query succeeds", async () => {
+    const supabase = createSubscriptionSupabaseMock({
+      data: {
+        status: "active",
+        current_period_end: "2099-01-01T00:00:00.000Z",
+        plan_code: "mensual",
+      },
+      error: null,
+    });
+    const result = await fetchUserSubscription(supabase, "u1");
+    expect(result.error).toBeNull();
+    expect(result.row?.status).toBe("active");
+  });
+});
+
+describe("userHasActiveSubscription", () => {
+  const prevEnforce = process.env.PAGOLISTO_SUBSCRIPTION_ENFORCE;
+
+  afterEach(() => {
+    if (prevEnforce === undefined) delete process.env.PAGOLISTO_SUBSCRIPTION_ENFORCE;
+    else process.env.PAGOLISTO_SUBSCRIPTION_ENFORCE = prevEnforce;
+  });
+
+  it("returns false when subscription query fails (middleware must not throw)", async () => {
+    process.env.PAGOLISTO_SUBSCRIPTION_ENFORCE = "true";
+    const supabase = createSubscriptionSupabaseMock({
+      data: null,
+      error: { message: "permission denied" },
+    });
+    await expect(userHasActiveSubscription(supabase, "u1")).resolves.toBe(false);
+  });
+
+  it("returns false when fetch throws unexpectedly", async () => {
+    process.env.PAGOLISTO_SUBSCRIPTION_ENFORCE = "true";
+    const supabase = {
+      from: vi.fn(() => {
+        throw new Error("network down");
+      }),
+    } as unknown as SupabaseClient;
+    await expect(userHasActiveSubscription(supabase, "u1")).resolves.toBe(false);
   });
 });
 

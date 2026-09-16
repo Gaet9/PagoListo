@@ -12,7 +12,6 @@ import { TiendasSeleccionCards } from "@/components/tienda/tiendas-seleccion-car
 import { buildNegocioSlug } from "@/lib/negocio-slug";
 import { listNegocios } from "@/lib/queries/negocios";
 import type { NegocioListItem } from "@/lib/types/negocio";
-import { requirePaidUser } from "@/lib/auth/require-paid-user";
 import { createClient } from "@/lib/supabase/server";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -21,8 +20,6 @@ import { Suspense } from "react";
 
 async function TiendasIndexContent() {
   const supabase = await createClient();
-  await requirePaidUser(supabase);
-
   const { data: negociosRaw, error } = await listNegocios(supabase);
   if (error) {
     return (
