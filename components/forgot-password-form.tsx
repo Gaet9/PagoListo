@@ -22,6 +22,7 @@ import {
   markForgotPasswordEmailRequested,
   readForgotPasswordEmailRequestedFromSession,
 } from "@/lib/auth/forgot-password-sent-state";
+import { buildPasswordRecoveryRedirectTo } from "@/lib/auth/password-recovery";
 
 export function ForgotPasswordForm({
   className,
@@ -57,7 +58,7 @@ export function ForgotPasswordForm({
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/update-password`,
+        redirectTo: buildPasswordRecoveryRedirectTo(window.location.origin),
       });
       if (error) throw error;
       markForgotPasswordEmailRequested();
