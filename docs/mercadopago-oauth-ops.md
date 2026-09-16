@@ -49,4 +49,21 @@ Ver [`mercadopago-oauth-errores.md`](./mercadopago-oauth-errores.md). Nunca se e
 
 ## Migraciones Supabase
 
-Aplicar migraciones incl. **`20260915210000_mp_cobro_oauth_security.sql`** y **`20260916120000_mp_oauth_token_lockdown_harden.sql`** para revocar SELECT en `negocio_mercadopago_oauth` a `authenticated` / `anon`.
+Aplicar migraciones incl. **`20260915210000_mp_cobro_oauth_security.sql`** y **`20260916120000_mp_oauth_token_lockdown_harden.sql`** para revocar GRANT y eliminar políticas owner en `negocio_mercadopago_oauth`.
+
+**Verificación post-migración** (SQL editor Supabase):
+
+```sql
+-- Debe devolver 0 filas para anon/authenticated:
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public'
+  AND table_name = 'negocio_mercadopago_oauth'
+  AND grantee IN ('anon', 'authenticated');
+
+-- Debe devolver 0 filas (sin políticas client-side):
+SELECT polname FROM pg_policy
+WHERE polrelid = 'public.negocio_mercadopago_oauth'::regclass;
+```
+
+**Estado observado en prod (Pagolisto) antes del fix GAE-8:** GRANT SELECT a `anon`/`authenticated` y políticas `*_owner` activas → cualquier propietario autenticado podía leer `access_token` vía supabase-js. Las migraciones del repo `20260915*` / `20260916*` no estaban aplicadas en el proyecto remoto (solo migraciones con timestamp distinto).
