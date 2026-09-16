@@ -1,7 +1,9 @@
 -- GAE-24: OAuth tokens must not be readable from the browser (authenticated JWT).
 -- All reads/writes go through API routes with service_role.
 
-REVOKE SELECT, INSERT, UPDATE, DELETE ON public.negocio_mercadopago_oauth FROM authenticated;
+REVOKE ALL ON TABLE public.negocio_mercadopago_oauth FROM PUBLIC;
+REVOKE ALL ON TABLE public.negocio_mercadopago_oauth FROM anon;
+REVOKE ALL ON TABLE public.negocio_mercadopago_oauth FROM authenticated;
 
 DROP POLICY IF EXISTS negocio_mercadopago_oauth_select_owner ON public.negocio_mercadopago_oauth;
 DROP POLICY IF EXISTS negocio_mercadopago_oauth_insert_owner ON public.negocio_mercadopago_oauth;

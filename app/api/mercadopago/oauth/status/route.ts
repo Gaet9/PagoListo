@@ -58,7 +58,8 @@ export async function GET(request: NextRequest) {
         .eq("negocio_id", negocioId)
         .maybeSingle();
     if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error("[mp-oauth/status] read failed", error.message);
+        return NextResponse.json({ error: "No se pudo consultar el estado de Mercado Pago." }, { status: 500 });
     }
 
     if (!row) {

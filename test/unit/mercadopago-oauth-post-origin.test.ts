@@ -24,4 +24,15 @@ describe("getMercadoPagoOAuthPostConsentOrigin", () => {
     const origin = getMercadoPagoOAuthPostConsentOrigin(new URL("http://localhost:3000/x"));
     expect(origin).toBe("https://custom-dev.example");
   });
+
+  it("en producción usa NEXT_PUBLIC_SITE_URL canónico cuando callback es apex equivalente", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://www.pagolisto.com.ar");
+
+    const { getMercadoPagoOAuthPostConsentOrigin } = await import("@/lib/mercadopago/oauth-post-consent-origin");
+    const origin = getMercadoPagoOAuthPostConsentOrigin(
+      new URL("https://pagolisto.com.ar/api/mercadopago/oauth/callback?code=x&state=y"),
+    );
+    expect(origin).toBe("https://www.pagolisto.com.ar");
+  });
 });
