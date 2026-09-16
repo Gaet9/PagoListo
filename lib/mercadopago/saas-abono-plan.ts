@@ -42,6 +42,7 @@ export function resolveSaasAbonoPlan(planCode: string | undefined): SaasAbonoPla
   };
 }
 
+/** IPN/Webhooks del abono SaaS (misma ruta que cobro en tienda). Debe coincidir con `NEXT_PUBLIC_SITE_URL` canónica. */
 export function getMercadoPagoSaasAbonoWebhookUrl(baseUrl: string): string {
   return `${baseUrl.replace(/\/$/, "")}/api/mercadopago/webhook`;
 }

@@ -60,7 +60,7 @@ La integración de cobro en tienda usa la **API de Preferences** de Mercado Pago
 
 1. **OAuth por negocio**: cada tienda puede vincular su cuenta MP (`/api/mercadopago/oauth/start` → MP → `/api/mercadopago/oauth/callback`). Los tokens se guardan en Supabase (`negocio_mercadopago_oauth`).
 2. **Preferencia**: `POST /api/mercadopago/preference` usa el **access_token del vendedor** del negocio, crea la preferencia y un registro de intento (`mp_cobro_intentos`) con `external_reference` / metadata para el webhook.
-3. **Webhook**: `POST /api/mercadopago/webhook` notifica pagos; se valida el pago con la API MP y, si está **aprobado**, se crea la venta de forma idempotente (evitar duplicados por `mp_payment_id`).
+3. **Webhook**: `GET` y `POST /api/mercadopago/webhook` (IPN legacy + Webhooks v2). Se valida firma cuando aplica (`data.id` en query), se consulta el pago en la API MP y, si está **aprobado**, se activa abono SaaS o se crea la venta de tienda de forma idempotente.
 4. **UI**: pestaña **Cobrar** (QR), **Configuración** (conexión y cuenta), **Perfil** (resumen por negocio).
 5. **Errores de vinculación**: tras OAuth, la app vuelve con `mp_oauth=ok` o `mp_oauth=error` (mensajes en español). Ver [`docs/mercadopago-oauth-errores.md`](docs/mercadopago-oauth-errores.md).
 
@@ -72,7 +72,8 @@ La integración de cobro en tienda usa la **API de Preferences** de Mercado Pago
 - En `.env.local` (ver `.env.example`):
   - `MERCADOPAGO_OAUTH_CLIENT_ID`, `MERCADOPAGO_OAUTH_CLIENT_SECRET`
   - Opcional: `MERCADOPAGO_OAUTH_REDIRECT_URI` si no querés derivarlo de `NEXT_PUBLIC_SITE_URL`
-  - Webhook: `MERCADOPAGO_WEBHOOK_SECRET`; opcional `MERCADOPAGO_WEBHOOK_ENFORCE_SIGNATURE` (en flujos QR a veces la firma no aplica; el código hace verificación best-effort).
+  - Webhook: `MERCADOPAGO_WEBHOOK_SECRET` (clave del panel MP → Webhooks). Por defecto el código exige `x-signature` salvo `MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED=true` o deuda `MERCADOPAGO_WEBHOOK_ENFORCE_SIGNATURE=false`.
+  - `NEXT_PUBLIC_SITE_URL` debe ser la URL **canónica** (p. ej. `https://www.…`) usada en `notification_url`; apex con redirect suele impedir que MP entregue el webhook.
 - **Desarrollo** (`next dev`): por defecto, tras OAuth el navegador vuelve a `http://localhost:3000` para alinear cookies de Supabase aunque `NEXT_PUBLIC_SITE_URL` sea ngrok; configurable con `MERCADOPAGO_OAUTH_BROWSER_RETURN_ORIGIN`.
 
 ### Checkout Pro “SaaS” (token global, opcional)
