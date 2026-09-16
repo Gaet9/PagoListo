@@ -49,3 +49,15 @@ export const RECOVERY_SESSION_MISSING_MESSAGE =
 
 export const RECOVERY_SESSION_EXPIRED_MESSAGE =
   "El enlace de recuperación expiró o no es válido. Pedí un correo nuevo desde «Olvidé mi contraseña».";
+
+/** Tiempo máximo en pantalla de redirección antes de mostrar error (p. ej. webview que bloquea `location.replace`). */
+export const RECOVERY_EXCHANGE_REDIRECT_TIMEOUT_MS = 10_000;
+
+export const RECOVERY_VERIFYING_MESSAGE =
+  "Verificando tu enlace de recuperación…";
+
+export const RECOVERY_REDIRECTING_MESSAGE =
+  "Redirigiendo para confirmar tu enlace…";
+
+export const RECOVERY_REDIRECT_FAILED_MESSAGE =
+  "No pudimos completar la validación del enlace. Abrilo en Safari o Chrome (no desde la vista previa del correo) o pedí un correo nuevo.";

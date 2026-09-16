@@ -5,8 +5,13 @@ import { createClient } from "@/lib/supabase/client";
 import {
   getRecoverySessionExchangePath,
   hasImplicitRecoveryHash,
+  PASSWORD_RECOVERY_UPDATE_PATH,
+  RECOVERY_EXCHANGE_REDIRECT_TIMEOUT_MS,
+  RECOVERY_REDIRECT_FAILED_MESSAGE,
+  RECOVERY_REDIRECTING_MESSAGE,
   RECOVERY_SESSION_EXPIRED_MESSAGE,
   RECOVERY_SESSION_MISSING_MESSAGE,
+  RECOVERY_VERIFYING_MESSAGE,
 } from "@/lib/auth/password-recovery";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +27,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type SessionStatus = "loading" | "ready" | "error";
+type SessionStatus = "loading" | "redirecting" | "ready" | "error";
 
 export function UpdatePasswordForm({
   className,
@@ -33,18 +38,17 @@ export function UpdatePasswordForm({
   const [isLoading, setIsLoading] = useState(false);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("loading");
   const [sessionMessage, setSessionMessage] = useState<string | null>(null);
+  const [manualExchangeHref, setManualExchangeHref] = useState<string | null>(
+    null,
+  );
   const router = useRouter();
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const exchangePath = getRecoverySessionExchangePath(searchParams);
-    if (exchangePath) {
-      window.location.replace(exchangePath);
-      return;
-    }
-
     let cancelled = false;
     const supabase = createClient();
+    const searchParams = new URLSearchParams(window.location.search);
+    const exchangePath = getRecoverySessionExchangePath(searchParams);
+    const recoveryCode = searchParams.get("code");
 
     const resolveSession = async (): Promise<boolean> => {
       const {
@@ -55,6 +59,7 @@ export function UpdatePasswordForm({
       if (!cancelled) {
         setSessionStatus("ready");
         setSessionMessage(null);
+        setManualExchangeHref(null);
       }
       return true;
     };
@@ -63,6 +68,20 @@ export function UpdatePasswordForm({
       if (cancelled) return;
       setSessionStatus("error");
       setSessionMessage(message);
+    };
+
+    const waitForRedirectOrTimeout = (path: string) => {
+      setSessionStatus("redirecting");
+      setManualExchangeHref(`${window.location.origin}${path}`);
+      window.location.replace(path);
+      return new Promise<void>((resolve) => {
+        window.setTimeout(() => {
+          if (!cancelled) {
+            failSession(RECOVERY_REDIRECT_FAILED_MESSAGE);
+          }
+          resolve();
+        }, RECOVERY_EXCHANGE_REDIRECT_TIMEOUT_MS);
+      });
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -78,6 +97,20 @@ export function UpdatePasswordForm({
     );
 
     void (async () => {
+      if (recoveryCode) {
+        const { error: exchangeError } =
+          await supabase.auth.exchangeCodeForSession(recoveryCode);
+        if (!cancelled && !exchangeError && (await resolveSession())) {
+          window.history.replaceState({}, "", PASSWORD_RECOVERY_UPDATE_PATH);
+          return;
+        }
+      }
+
+      if (exchangePath) {
+        await waitForRedirectOrTimeout(exchangePath);
+        return;
+      }
+
       if (await resolveSession()) return;
 
       const waitingForHash = hasImplicitRecoveryHash(window.location.hash);
@@ -135,7 +168,10 @@ export function UpdatePasswordForm({
   };
 
   const formDisabled = sessionStatus !== "ready" || isLoading;
-  const showSessionBlock = sessionStatus === "loading" || sessionStatus === "error";
+  const showSessionBlock =
+    sessionStatus === "loading" ||
+    sessionStatus === "redirecting" ||
+    sessionStatus === "error";
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -149,15 +185,38 @@ export function UpdatePasswordForm({
         <CardContent>
           {sessionStatus === "loading" ? (
             <p className="text-sm text-muted-foreground">
-              Verificando tu enlace de recuperación…
+              {RECOVERY_VERIFYING_MESSAGE}
             </p>
+          ) : null}
+          {sessionStatus === "redirecting" ? (
+            <div className="mb-4 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {RECOVERY_REDIRECTING_MESSAGE}
+              </p>
+              {manualExchangeHref ? (
+                <a
+                  href={manualExchangeHref}
+                  className="text-sm underline underline-offset-4"
+                >
+                  Continuar manualmente
+                </a>
+              ) : null}
+            </div>
           ) : null}
           {sessionStatus === "error" && sessionMessage ? (
             <div className="mb-4 space-y-3">
               <p className="text-sm text-red-500">{sessionMessage}</p>
+              {manualExchangeHref ? (
+                <a
+                  href={manualExchangeHref}
+                  className="block text-sm underline underline-offset-4"
+                >
+                  Continuar manualmente
+                </a>
+              ) : null}
               <Link
                 href="/auth/forgot-password"
-                className="text-sm underline underline-offset-4"
+                className="block text-sm underline underline-offset-4"
               >
                 Pedir un enlace nuevo
               </Link>

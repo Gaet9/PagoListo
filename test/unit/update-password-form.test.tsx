@@ -1,14 +1,37 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { UpdatePasswordForm } from "@/components/update-password-form";
+import {
+  RECOVERY_EXCHANGE_REDIRECT_TIMEOUT_MS,
+  RECOVERY_REDIRECT_FAILED_MESSAGE,
+  RECOVERY_REDIRECTING_MESSAGE,
+} from "@/lib/auth/password-recovery";
 
 const getUserMock = vi.fn();
 const updateUserMock = vi.fn();
+const exchangeCodeForSessionMock = vi.fn();
 const onAuthStateChangeMock = vi.fn();
+const replaceMock = vi.fn();
 
 const pushMock = vi.fn();
+
+function stubLocationWithReplaceMock() {
+  const { search, pathname, href } = window.location;
+  vi.stubGlobal("location", {
+    ...window.location,
+    origin: "https://www.pagolisto.com.ar",
+    href: href.includes("://")
+      ? href
+      : `https://www.pagolisto.com.ar${pathname}${search}`,
+    search,
+    pathname,
+    replace: replaceMock,
+    assign: vi.fn(),
+    reload: vi.fn(),
+  });
+}
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
@@ -19,6 +42,8 @@ vi.mock("@/lib/supabase/client", () => ({
     auth: {
       getUser: (...args: unknown[]) => getUserMock(...args),
       updateUser: (...args: unknown[]) => updateUserMock(...args),
+      exchangeCodeForSession: (...args: unknown[]) =>
+        exchangeCodeForSessionMock(...args),
       onAuthStateChange: (...args: unknown[]) => onAuthStateChangeMock(...args),
     },
   }),
@@ -28,11 +53,18 @@ describe("UpdatePasswordForm", () => {
   beforeEach(() => {
     getUserMock.mockReset();
     updateUserMock.mockReset();
+    exchangeCodeForSessionMock.mockReset();
     onAuthStateChangeMock.mockReset();
+    replaceMock.mockReset();
     onAuthStateChangeMock.mockReturnValue({
       data: { subscription: { unsubscribe: vi.fn() } },
     });
     window.history.replaceState({}, "", "/auth/update-password");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("muestra error si no hay sesión de recuperación", async () => {
@@ -71,5 +103,70 @@ describe("UpdatePasswordForm", () => {
     await user.click(screen.getByRole("button", { name: /guardar contraseña/i }));
 
     expect(updateUserMock).toHaveBeenCalledWith({ password: "unit-test-pw-value" });
+  });
+
+  it("intercambia el code en el cliente y habilita el formulario sin redirigir", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/update-password?code=recovery-code",
+    );
+    stubLocationWithReplaceMock();
+    exchangeCodeForSessionMock.mockResolvedValue({ error: null });
+    getUserMock.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+
+    render(<UpdatePasswordForm />);
+
+    await waitFor(() => {
+      expect(exchangeCodeForSessionMock).toHaveBeenCalledWith("recovery-code");
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /guardar contraseña/i }),
+      ).not.toBeDisabled();
+    });
+
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it("muestra redirección y enlace manual cuando hay code pero el intercambio falla", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/update-password?code=bad-code",
+    );
+    stubLocationWithReplaceMock();
+    exchangeCodeForSessionMock.mockResolvedValue({
+      error: new Error("invalid"),
+    });
+    getUserMock.mockResolvedValue({ data: { user: null }, error: null });
+
+    render(<UpdatePasswordForm />);
+
+    await waitFor(() => {
+      expect(screen.getByText(RECOVERY_REDIRECTING_MESSAGE)).toBeInTheDocument();
+    });
+
+    expect(replaceMock).toHaveBeenCalledWith(
+      "/auth/callback?code=bad-code&next=%2Fauth%2Fupdate-password",
+    );
+
+    expect(
+      screen.getByRole("link", { name: /continuar manualmente/i }),
+    ).toHaveAttribute(
+      "href",
+      "https://www.pagolisto.com.ar/auth/callback?code=bad-code&next=%2Fauth%2Fupdate-password",
+    );
+
+    await vi.advanceTimersByTimeAsync(RECOVERY_EXCHANGE_REDIRECT_TIMEOUT_MS);
+
+    await waitFor(() => {
+      expect(screen.getByText(RECOVERY_REDIRECT_FAILED_MESSAGE)).toBeInTheDocument();
+    });
   });
 });
