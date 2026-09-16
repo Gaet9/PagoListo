@@ -19,4 +19,10 @@ describe("getSafeInternalNextPath", () => {
         expect(getSafeInternalNextPath("/auth/login")).toBe("/perfil");
         expect(getSafeInternalNextPath("/api/x")).toBe("/perfil");
     });
+
+    it("allows password recovery destination", () => {
+        expect(getSafeInternalNextPath("/auth/update-password")).toBe(
+            "/auth/update-password",
+        );
+    });
 });

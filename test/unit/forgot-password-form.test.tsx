@@ -32,6 +32,15 @@ describe("ForgotPasswordForm", () => {
     );
     await user.click(screen.getByRole("button", { name: /enviar correo/i }));
 
+    expect(resetPasswordForEmailMock).toHaveBeenCalledWith(
+      "usuario@ejemplo.com",
+      {
+        redirectTo: expect.stringMatching(
+          /\/auth\/callback\?next=%2Fauth%2Fupdate-password$/,
+        ),
+      },
+    );
+
     expect(
       screen.getByText(/revisá tu correo si tenés cuenta/i),
     ).toBeInTheDocument();
