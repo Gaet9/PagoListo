@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   RESEND_FALLBACK_FROM,
@@ -11,6 +11,7 @@ describe("resend email env", () => {
   const prevFrom = process.env.RESEND_FROM;
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     if (prevKey === undefined) delete process.env.RESEND_API_KEY;
     else process.env.RESEND_API_KEY = prevKey;
     if (prevFrom === undefined) delete process.env.RESEND_FROM;
@@ -32,8 +33,21 @@ describe("resend email env", () => {
     expect(getResendFromAddress()).toBe("hola@pagolisto.com.ar");
   });
 
-  it("getResendFromAddress falls back for unverified domain setup", () => {
+  it("getResendFromAddress falls back in development when RESEND_FROM is missing", () => {
+    vi.stubEnv("NODE_ENV", "development");
     delete process.env.RESEND_FROM;
     expect(getResendFromAddress()).toBe(RESEND_FALLBACK_FROM);
+  });
+
+  it("getResendFromAddress falls back in test when RESEND_FROM is missing", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    delete process.env.RESEND_FROM;
+    expect(getResendFromAddress()).toBe(RESEND_FALLBACK_FROM);
+  });
+
+  it("getResendFromAddress throws in production when RESEND_FROM is missing", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    delete process.env.RESEND_FROM;
+    expect(() => getResendFromAddress()).toThrow(/RESEND_FROM/);
   });
 });
