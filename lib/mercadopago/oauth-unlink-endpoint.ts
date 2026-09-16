@@ -1,10 +1,7 @@
 /**
- * Endpoint seguro de desvinculación MP por negocio (GAE-8, Rodrigo).
+ * Endpoint seguro de desvinculación MP por negocio (GAE-8 + GAE-37 / PR #25).
  *
- * **Blocked on Rodrigo path confirmation** (cloud agent `bc-f448bb1e`): cuando confirme el path
- * definitivo, actualizar solo esta constante. El cliente nunca toca tokens.
- *
- * Contrato esperado:
+ * Contrato:
  * - `POST` con JSON `{ "negocioId": string }`
  * - `200` → `{ "ok": true }` (revoke + delete solo en servidor)
  * - errores → `{ "error": string }` (opcional `code`)

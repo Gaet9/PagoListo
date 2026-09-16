@@ -23,7 +23,8 @@ El código detallado va en `mp_oauth_error`. Todos son **recuperables**: volvé 
 
 ## Seguridad (sin cambios)
 
-- **PKCE** (`code_verifier` / `code_challenge`) y **state** de un solo uso en `mp_oauth_states`.
+- **PKCE** obligatorio (`code_verifier` en `mp_oauth_states`; intercambio rechazado si falta).
+- **State** de un solo uso en `mp_oauth_states`.
 - **Tokens** (`access_token`, `refresh_token`) solo en servidor (`service_role`); el cliente solo ve estado vía `GET /api/mercadopago/oauth/status`.
 - El `redirectTo` del inicio OAuth solo acepta rutas del mismo sitio.
 
@@ -32,3 +33,17 @@ El código detallado va en `mp_oauth_error`. Todos son **recuperables**: volvé 
 1. **Mi tienda → Configuración** — recomendado (pasos y cuenta vinculada).
 2. **Perfil** — resumen por negocio y botón «Conectar Mercado Pago» (vuelve a Perfil al terminar).
 3. **Cobrar → Mercado Pago (QR)** — si falta la cuenta, botón directo (vuelve a **Cobrar** al terminar).
+
+## Desvincular (API server — GAE-8 / GAE-37 UI, PR #25)
+
+Solo rutas server; nunca borrar tokens desde supabase-js en el navegador.
+
+| Método | Ruta | Body |
+| ------ | ---- | ---- |
+| `POST` | `/api/mercadopago/oauth/unlink` | `{ "negocioId": "<uuid>" }` |
+
+Constante compartida con el cliente UI: `MERCADOPAGO_OAUTH_UNLINK_API_PATH` en `lib/mercadopago/oauth-unlink-endpoint.ts`.
+
+Respuesta segura (sin tokens): `{ "ok": true }` con HTTP 200 (también si ya estaba desvinculado).
+
+Re-vincular: `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…` (nuevo state + PKCE; filas locales ya borradas).

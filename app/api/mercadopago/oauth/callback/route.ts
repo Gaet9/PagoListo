@@ -67,8 +67,14 @@ export async function GET(request: NextRequest) {
         return redirectWithError(postOrigin, redirectTo, "estado_expirado");
     }
 
+    const codeVerifier = stateRow.code_verifier?.trim();
+    if (!codeVerifier) {
+        await admin.from("mp_oauth_states").delete().eq("state", state);
+        return redirectWithError(postOrigin, redirectTo, "estado_invalido");
+    }
+
     try {
-        const token = await exchangeCodeForToken({ code, codeVerifier: stateRow.code_verifier ?? null });
+        const token = await exchangeCodeForToken({ code, codeVerifier });
         const expiresAt =
             typeof token.expires_in === "number" && Number.isFinite(token.expires_in) ?
                 new Date(Date.now() + token.expires_in * 1000).toISOString()
@@ -86,6 +92,7 @@ export async function GET(request: NextRequest) {
             { onConflict: "negocio_id" },
         );
         if (upsertErr) {
+            console.error("[mp-oauth/callback] negocio_mercadopago_oauth upsert failed", upsertErr.message);
             return redirectWithError(postOrigin, redirectTo, "guardado_fallido");
         }
 
