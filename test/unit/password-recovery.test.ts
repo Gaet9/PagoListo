@@ -36,6 +36,10 @@ describe("password-recovery", () => {
     expect(
       hasImplicitRecoveryHash("#access_token=x&type=recovery"),
     ).toBe(true);
+    expect(hasImplicitRecoveryHash("#access_token=x&refresh_token=y")).toBe(
+      true,
+    );
+    expect(hasImplicitRecoveryHash("#error=access_denied")).toBe(false);
     expect(hasImplicitRecoveryHash("")).toBe(false);
   });
 });

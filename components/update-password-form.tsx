@@ -3,11 +3,15 @@
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import {
-  getRecoverySessionExchangePath,
-  hasImplicitRecoveryHash,
   RECOVERY_SESSION_EXPIRED_MESSAGE,
   RECOVERY_SESSION_MISSING_MESSAGE,
 } from "@/lib/auth/password-recovery";
+import {
+  RECOVERY_SESSION_VERIFY_TIMEOUT_MS,
+  resolveUpdatePasswordSession,
+  sessionHasUser,
+  stripRecoveryParamsFromUrl,
+} from "@/lib/auth/update-password-session";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,70 +40,74 @@ export function UpdatePasswordForm({
   const router = useRouter();
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const exchangePath = getRecoverySessionExchangePath(searchParams);
-    if (exchangePath) {
-      window.location.replace(exchangePath);
-      return;
-    }
-
     let cancelled = false;
+    let resolved = false;
     const supabase = createClient();
 
-    const resolveSession = async (): Promise<boolean> => {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-      if (userError || !user) return false;
-      if (!cancelled) {
-        setSessionStatus("ready");
-        setSessionMessage(null);
-      }
-      return true;
+    const markReady = () => {
+      if (cancelled) return;
+      resolved = true;
+      stripRecoveryParamsFromUrl();
+      setSessionStatus("ready");
+      setSessionMessage(null);
     };
 
-    const failSession = (message: string) => {
+    const markError = (message: string) => {
       if (cancelled) return;
+      resolved = true;
       setSessionStatus("error");
       setSessionMessage(message);
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event) => {
+      (event, session) => {
+        if (cancelled) return;
         if (
-          event === "SIGNED_IN" ||
-          event === "PASSWORD_RECOVERY" ||
-          event === "TOKEN_REFRESHED"
+          (event === "SIGNED_IN" ||
+            event === "PASSWORD_RECOVERY" ||
+            event === "TOKEN_REFRESHED") &&
+          sessionHasUser(session)
         ) {
-          await resolveSession();
+          markReady();
         }
       },
     );
 
+    const verifyTimeout = window.setTimeout(() => {
+      if (cancelled || resolved) return;
+      markError(RECOVERY_SESSION_EXPIRED_MESSAGE);
+    }, RECOVERY_SESSION_VERIFY_TIMEOUT_MS);
+
     void (async () => {
-      if (await resolveSession()) return;
+      try {
+        const resolution = await resolveUpdatePasswordSession(
+          supabase,
+          window.location,
+        );
 
-      const waitingForHash = hasImplicitRecoveryHash(window.location.hash);
+        if (cancelled) return;
 
-      if (waitingForHash) {
-        for (let attempt = 0; attempt < 30; attempt += 1) {
-          if (cancelled) return;
-          if (await resolveSession()) return;
-          await new Promise((resolve) => setTimeout(resolve, 100));
+        if (resolution.kind === "redirect") {
+          window.location.replace(resolution.path);
+          return;
         }
-        failSession(RECOVERY_SESSION_EXPIRED_MESSAGE);
-        return;
-      }
 
-      const hasSession = await resolveSession();
-      if (!hasSession && !cancelled) {
-        failSession(RECOVERY_SESSION_MISSING_MESSAGE);
+        if (resolution.kind === "ready") {
+          markReady();
+          return;
+        }
+
+        markError(resolution.message);
+      } catch {
+        if (!cancelled) {
+          markError(RECOVERY_SESSION_MISSING_MESSAGE);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
+      window.clearTimeout(verifyTimeout);
       authListener.subscription.unsubscribe();
     };
   }, []);

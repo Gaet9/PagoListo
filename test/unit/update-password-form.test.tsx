@@ -5,6 +5,8 @@ import userEvent from "@testing-library/user-event";
 import { UpdatePasswordForm } from "@/components/update-password-form";
 
 const getUserMock = vi.fn();
+const getSessionMock = vi.fn();
+const exchangeCodeForSessionMock = vi.fn();
 const updateUserMock = vi.fn();
 const onAuthStateChangeMock = vi.fn();
 
@@ -18,6 +20,9 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     auth: {
       getUser: (...args: unknown[]) => getUserMock(...args),
+      getSession: (...args: unknown[]) => getSessionMock(...args),
+      exchangeCodeForSession: (...args: unknown[]) =>
+        exchangeCodeForSessionMock(...args),
       updateUser: (...args: unknown[]) => updateUserMock(...args),
       onAuthStateChange: (...args: unknown[]) => onAuthStateChangeMock(...args),
     },
@@ -27,15 +32,21 @@ vi.mock("@/lib/supabase/client", () => ({
 describe("UpdatePasswordForm", () => {
   beforeEach(() => {
     getUserMock.mockReset();
+    getSessionMock.mockReset();
+    exchangeCodeForSessionMock.mockReset();
     updateUserMock.mockReset();
     onAuthStateChangeMock.mockReset();
     onAuthStateChangeMock.mockReturnValue({
       data: { subscription: { unsubscribe: vi.fn() } },
     });
+    getSessionMock.mockResolvedValue({ data: { session: null } });
+    getUserMock.mockResolvedValue({ data: { user: null }, error: null });
+    exchangeCodeForSessionMock.mockResolvedValue({ error: { message: "no" } });
     window.history.replaceState({}, "", "/auth/update-password");
   });
 
   it("muestra error si no hay sesión de recuperación", async () => {
+    getSessionMock.mockResolvedValue({ data: { session: null } });
     getUserMock.mockResolvedValue({ data: { user: null }, error: null });
 
     render(<UpdatePasswordForm />);
@@ -52,6 +63,9 @@ describe("UpdatePasswordForm", () => {
   });
 
   it("actualiza la contraseña cuando hay sesión", async () => {
+    getSessionMock.mockResolvedValue({
+      data: { session: { user: { id: "user-1" } } },
+    });
     getUserMock.mockResolvedValue({
       data: { user: { id: "user-1" } },
       error: null,

@@ -38,10 +38,10 @@ export function getRecoverySessionExchangePath(
 export function hasImplicitRecoveryHash(hash: string): boolean {
   if (!hash || hash.length <= 1) return false;
   const params = new URLSearchParams(hash.replace(/^#/, ""));
-  return (
-    params.get("type") === "recovery" ||
-    (params.has("access_token") && params.get("type") === "recovery")
-  );
+  if (params.get("error")) return false;
+  if (params.get("type") === "recovery") return true;
+  // Algunos enlaces traen tokens en el hash sin `type=recovery`.
+  return params.has("access_token");
 }
 
 export const RECOVERY_SESSION_MISSING_MESSAGE =
