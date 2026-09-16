@@ -23,7 +23,8 @@ El código detallado va en `mp_oauth_error`. Todos son **recuperables**: volvé 
 
 ## Seguridad (sin cambios)
 
-- **PKCE** (`code_verifier` / `code_challenge`) y **state** de un solo uso en `mp_oauth_states`.
+- **PKCE** obligatorio (`code_verifier` en `mp_oauth_states`; intercambio rechazado si falta).
+- **State** de un solo uso en `mp_oauth_states`.
 - **Tokens** (`access_token`, `refresh_token`) solo en servidor (`service_role`); el cliente solo ve estado vía `GET /api/mercadopago/oauth/status`.
 - El `redirectTo` del inicio OAuth solo acepta rutas del mismo sitio.
 

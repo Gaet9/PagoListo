@@ -2,6 +2,8 @@ import "server-only";
 
 import crypto from "crypto";
 
+import { getMercadoPagoOAuthRedirectUri } from "@/lib/mercadopago/oauth-redirect-uri";
+
 export type MercadoPagoOAuthTokenResponse = {
   access_token: string;
   token_type: string;
@@ -33,13 +35,7 @@ export function getMercadoPagoOAuthClientSecret(): string {
   return v;
 }
 
-export function getMercadoPagoOAuthRedirectUri(): string {
-  const explicit = process.env.MERCADOPAGO_OAUTH_REDIRECT_URI?.trim();
-  if (explicit) return explicit;
-  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (!site) throw new Error("MERCADOPAGO_OAUTH_REDIRECT_URI (or NEXT_PUBLIC_SITE_URL) is not set.");
-  return `${site.replace(/\/$/, "")}/api/mercadopago/oauth/callback`;
-}
+export { getMercadoPagoOAuthRedirectUri } from "@/lib/mercadopago/oauth-redirect-uri";
 
 export { getMercadoPagoOAuthPostConsentOrigin } from "./oauth-post-consent-origin";
 

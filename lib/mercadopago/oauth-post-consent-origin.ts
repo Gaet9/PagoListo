@@ -1,3 +1,9 @@
+import {
+    areEquivalentSiteHostnames,
+    areEquivalentSiteOrigins,
+    getConfiguredSiteOrigin,
+} from "@/lib/mercadopago/oauth-site-host";
+
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 
 function effectivePort(u: URL): string {
@@ -59,8 +65,27 @@ export function getMercadoPagoOAuthPostConsentOrigin(requestUrl: URL): string {
         return site.origin;
     }
 
+    if (
+        !reqLoop &&
+        !siteLoop &&
+        areEquivalentSiteHostnames(siteHost, reqHost) &&
+        site.protocol === requestUrl.protocol
+    ) {
+        // Producción: volver al host canónico de NEXT_PUBLIC_SITE_URL (p. ej. www) aunque el callback llegue al apex.
+        return site.origin;
+    }
+
     if (siteLoop && reqLoop) {
         return site.origin;
+    }
+
+    const configured = getConfiguredSiteOrigin();
+    if (
+        configured &&
+        !reqLoop &&
+        areEquivalentSiteOrigins(configured, requestUrl.origin)
+    ) {
+        return configured;
     }
 
     return requestUrl.origin;
