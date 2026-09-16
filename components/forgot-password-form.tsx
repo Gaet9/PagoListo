@@ -49,15 +49,17 @@ export function ForgotPasswordForm({
       {success ? (
         <Card>
           <CardHeader>
-            <CardTitle>Revisa tu correo</CardTitle>
+            <CardTitle>Revisá tu correo si tenés cuenta</CardTitle>
             <CardDescription>
-              Te enviamos instrucciones para restablecer la contraseña
+              Si existe una cuenta con ese correo, vas a recibir instrucciones
+              para restablecer la contraseña.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Si te registraste con correo y contraseña, recibirás un enlace para
-              elegir una contraseña nueva.
+              Revisá la bandeja de entrada y el correo no deseado. Si te
+              registraste con correo y contraseña, el enlace te permite elegir
+              una contraseña nueva.
             </p>
           </CardContent>
         </Card>
