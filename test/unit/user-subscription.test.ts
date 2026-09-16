@@ -1,7 +1,9 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   computeNextSubscriptionPeriodEnd,
+  fetchUserSubscription,
   isActiveSubscription,
   isSubscriptionEnforcementEnabled,
 } from "@/lib/auth/user-subscription";
@@ -65,6 +67,43 @@ describe("isActiveSubscription", () => {
         now,
       ),
     ).toBe(true);
+  });
+});
+
+describe("fetchUserSubscription", () => {
+  it("falls back to core columns when plan_code is missing in the database", async () => {
+    const coreRow = {
+      status: "active",
+      current_period_end: "2099-01-01T00:00:00.000Z",
+    };
+    const from = vi.fn(() => ({
+      select: vi.fn((columns: string) => {
+        if (columns.includes("plan_code")) {
+          return {
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: null,
+                error: { message: 'column "plan_code" does not exist', code: "42703" },
+              }),
+            }),
+          };
+        }
+        return {
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: coreRow, error: null }),
+          }),
+        };
+      }),
+    }));
+    const supabase = { from } as unknown as SupabaseClient;
+
+    const row = await fetchUserSubscription(supabase, "user-1");
+    expect(row).toEqual({
+      status: "active",
+      current_period_end: "2099-01-01T00:00:00.000Z",
+      plan_code: null,
+      canceled_at: null,
+    });
   });
 });
 

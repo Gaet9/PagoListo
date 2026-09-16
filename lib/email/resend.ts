@@ -2,9 +2,14 @@ import "server-only";
 
 import { Resend } from "resend";
 
-import { getResendApiKey, getResendFromAddress } from "@/lib/email/resend-config";
+import { getResendApiKey, resolveResendFromAddress } from "@/lib/email/resend-config";
 
-export { RESEND_FALLBACK_FROM, getResendApiKey, getResendFromAddress } from "@/lib/email/resend-config";
+export {
+  RESEND_FALLBACK_FROM,
+  getResendApiKey,
+  getResendFromAddress,
+  resolveResendFromAddress,
+} from "@/lib/email/resend-config";
 
 export function getResendClient(): Resend {
   return new Resend(getResendApiKey());
@@ -30,8 +35,26 @@ export async function sendTransactionalEmail(
     return { ok: false, message: "Se requiere text o html." };
   }
 
-  const client = getResendClient();
-  const fromAddress = from ?? getResendFromAddress();
+  let fromAddress = from?.trim() || null;
+  if (!fromAddress) {
+    fromAddress = resolveResendFromAddress();
+  }
+  if (!fromAddress) {
+    return {
+      ok: false,
+      message:
+        "RESEND_FROM no está configurado. Agregalo al entorno de producción (p. ej. hola@pagolisto.com.ar).",
+    };
+  }
+
+  let client: Resend;
+  try {
+    client = getResendClient();
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "RESEND_API_KEY no está configurado.";
+    return { ok: false, message };
+  }
   const result = html
     ? await client.emails.send({
         from: fromAddress,
