@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect } from "react";
 
 import { CobrarTab } from "@/components/tienda/cobrar-tab";
+
+const mpBannerReportsConnected = vi.hoisted(() => ({ value: true }));
 
 const rpcMock = vi.fn();
 
@@ -32,11 +35,21 @@ vi.mock("@/components/tienda/barcode-scanner-dialog", () => ({
 }));
 
 vi.mock("@/components/tienda/mercadopago-oauth-status-banner", () => ({
-    MercadoPagoOAuthStatusBanner: () => null,
+    MercadoPagoOAuthStatusBanner: ({
+        onConnectionChange,
+    }: {
+        onConnectionChange?: (connected: boolean) => void;
+    }) => {
+        useEffect(() => {
+            onConnectionChange?.(mpBannerReportsConnected.value);
+        }, [onConnectionChange]);
+        return null;
+    },
 }));
 
 describe("CobrarTab", () => {
     beforeEach(() => {
+        mpBannerReportsConnected.value = true;
         listProductosMock.mockReset();
         rpcMock.mockReset();
         toastSuccess.mockReset();
@@ -178,6 +191,18 @@ describe("CobrarTab", () => {
         expect(rpcMock).toHaveBeenCalledWith("create_venta_efectivo", {
             p_negocio_id: "n1",
             p_items: [{ producto_id: "p1", qty: 1 }],
+        });
+    });
+
+    it("deshabilita Mercado Pago (QR) cuando la cuenta está desvinculada", async () => {
+        mpBannerReportsConnected.value = false;
+        listProductosMock.mockResolvedValue({ data: [], error: null });
+
+        render(<CobrarTab negocioId='n1' />);
+
+        await waitFor(() => {
+            expect(screen.getByRole("button", { name: "Mercado Pago (QR)" })).toBeDisabled();
+            expect(screen.getByText(/Mercado Pago está desvinculada/i)).toBeInTheDocument();
         });
     });
 });

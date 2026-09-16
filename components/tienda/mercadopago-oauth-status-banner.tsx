@@ -22,6 +22,8 @@ type Props = {
     configuracionHref?: string;
     /** Si cambia, se vuelve a consultar el estado. */
     refreshKey?: number;
+    /** Notifica vinculación MP (p. ej. para habilitar cobro QR en Cobrar). */
+    onConnectionChange?: (connected: boolean) => void;
 };
 
 export function MercadoPagoOAuthStatusBanner({
@@ -30,6 +32,7 @@ export function MercadoPagoOAuthStatusBanner({
     variant = "cobrar",
     configuracionHref,
     refreshKey = 0,
+    onConnectionChange,
 }: Props) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -44,11 +47,13 @@ export function MercadoPagoOAuthStatusBanner({
         if (!result.ok) {
             setStatus(null);
             setError(result.message);
+            onConnectionChange?.(false);
             return;
         }
         setStatus(result.status);
+        onConnectionChange?.(result.status.connected);
         if (result.status.connected) setWasConnected(true);
-    }, [negocioId]);
+    }, [negocioId, onConnectionChange]);
 
     useEffect(() => {
         void load();
