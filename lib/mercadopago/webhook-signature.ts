@@ -56,17 +56,28 @@ export function mercadoPagoWebhookRequiresSignatureHeader(): boolean {
 }
 
 /**
- * When MP sends `x-signature`, a bad signature must reject the notification.
+ * When MP sends `x-signature` and `data.id` is present in the query string, a bad signature rejects the notification.
+ *
+ * Checkout Pro `notification_url` (per-preference) and legacy IPN may send `x-signature` without a verifiable
+ * `data.id` query param; MP documents that those URLs cannot be validated with the app secret. In that case we
+ * continue and rely on GET /v1/payments/{id} + amount/intento checks (see webhook route).
+ *
  * When the header is absent, rejection follows {@link mercadoPagoWebhookRequiresSignatureHeader}.
  */
 export function shouldRejectMercadoPagoWebhookForSignature(input: {
   xSignature: string | null;
   signatureOk: boolean;
+  /** Query `data.id` used for the HMAC manifest (Webhooks v2). */
+  signatureDataIdFromQuery: string | null;
   enforceWhenHeaderMissing?: boolean;
 }): boolean {
   const enforceWhenHeaderMissing = input.enforceWhenHeaderMissing ?? mercadoPagoWebhookRequiresSignatureHeader();
   const hasSigHeader = !!input.xSignature?.trim();
-  if (hasSigHeader && !input.signatureOk) return true;
+  if (hasSigHeader && input.signatureOk) return false;
+  if (hasSigHeader && !input.signatureOk) {
+    const canStrictlyValidate = !!input.signatureDataIdFromQuery?.trim();
+    return canStrictlyValidate;
+  }
   if (!hasSigHeader && enforceWhenHeaderMissing) return true;
   return false;
 }

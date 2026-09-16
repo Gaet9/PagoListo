@@ -60,14 +60,26 @@ describe("shouldRejectMercadoPagoWebhookForSignature", () => {
     process.env = env;
   });
 
-  it("rejects when header is present but invalid", () => {
+  it("rejects when header is present but invalid and query data.id is set", () => {
     expect(
       shouldRejectMercadoPagoWebhookForSignature({
         xSignature: "ts=1,v1=deadbeef",
         signatureOk: false,
+        signatureDataIdFromQuery: "123",
         enforceWhenHeaderMissing: false,
       }),
     ).toBe(true);
+  });
+
+  it("allows invalid header when query data.id is absent (preference IPN / notification_url)", () => {
+    expect(
+      shouldRejectMercadoPagoWebhookForSignature({
+        xSignature: "ts=1,v1=deadbeef",
+        signatureOk: false,
+        signatureDataIdFromQuery: null,
+        enforceWhenHeaderMissing: false,
+      }),
+    ).toBe(false);
   });
 
   it("rejects missing header by default (secure)", () => {
@@ -76,6 +88,7 @@ describe("shouldRejectMercadoPagoWebhookForSignature", () => {
       shouldRejectMercadoPagoWebhookForSignature({
         xSignature: null,
         signatureOk: false,
+        signatureDataIdFromQuery: null,
       }),
     ).toBe(true);
   });
@@ -87,6 +100,7 @@ describe("shouldRejectMercadoPagoWebhookForSignature", () => {
       shouldRejectMercadoPagoWebhookForSignature({
         xSignature: null,
         signatureOk: false,
+        signatureDataIdFromQuery: null,
       }),
     ).toBe(false);
   });

@@ -49,35 +49,54 @@ export async function processSaasAbonoApprovedPayment(
   }
 
   const intentoLookupId = resolveSaasAbonoIntentoLookupId(payment);
-  if (!intentoLookupId) {
-    return { handled: false, reason: "missing_reference" };
+  const preferenceId = typeof payment.preference_id === "string" ? payment.preference_id.trim() : null;
+
+  let intento: SaasAbonoIntentoRow | null = null;
+  let intentoErr: { message: string } | null = null;
+
+  if (intentoLookupId) {
+    const res = await admin
+      .from("mp_saas_abono_intentos")
+      .select("id, usuario_id, plan_code, expected_total_ars, mp_preference_id, consumed_at, mp_payment_id")
+      .eq("id", intentoLookupId)
+      .maybeSingle<SaasAbonoIntentoRow>();
+    intento = res.data;
+    intentoErr = res.error;
   }
 
-  const { data: intento, error: intentoErr } = await admin
-    .from("mp_saas_abono_intentos")
-    .select("id, usuario_id, plan_code, expected_total_ars, mp_preference_id, consumed_at, mp_payment_id")
-    .eq("id", intentoLookupId)
-    .maybeSingle<SaasAbonoIntentoRow>();
+  if ((!intento || intentoErr) && preferenceId) {
+    const res = await admin
+      .from("mp_saas_abono_intentos")
+      .select("id, usuario_id, plan_code, expected_total_ars, mp_preference_id, consumed_at, mp_payment_id")
+      .eq("mp_preference_id", preferenceId)
+      .is("consumed_at", null)
+      .is("mp_payment_id", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<SaasAbonoIntentoRow>();
+    intento = res.data ?? intento;
+    intentoErr = res.error ?? intentoErr;
+  }
 
   if (intentoErr || !intento) {
-    return { handled: false, reason: "intento_not_found" };
+    return { handled: false, reason: intentoLookupId ? "intento_not_found" : "missing_reference" };
   }
 
   if (intento.consumed_at || intento.mp_payment_id) {
     return { handled: true, reason: "already_consumed" };
   }
 
-  const preferenceId = typeof payment.preference_id === "string" ? payment.preference_id : null;
   if (preferenceId && intento.mp_preference_id !== preferenceId) {
     return { handled: true, reason: "preference_mismatch" };
   }
 
   const expectedTotal = expectedTotalFromIntento(intento.expected_total_ars);
   const paidAmount = typeof payment.transaction_amount === "number" ? payment.transaction_amount : null;
-  if (expectedTotal !== null && expectedTotal > 0) {
-    if (paidAmount === null || !mercadoPagoAmountsMatch(expectedTotal, paidAmount)) {
-      return { handled: true, reason: "amount_mismatch" };
-    }
+  if (expectedTotal === null || expectedTotal <= 0) {
+    return { handled: true, reason: "expected_total_invalid" };
+  }
+  if (paidAmount === null || !mercadoPagoAmountsMatch(expectedTotal, paidAmount)) {
+    return { handled: true, reason: "amount_mismatch" };
   }
 
   const nowIso = new Date().toISOString();
