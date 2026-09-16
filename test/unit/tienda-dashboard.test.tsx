@@ -100,7 +100,7 @@ describe("TiendaDashboard", () => {
         await waitFor(() => {
             expect(screen.getByRole("heading", { name: "Configuración" })).toBeInTheDocument();
         });
-        expect(screen.getByRole("button", { name: "Conectar a Mercado Pago" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Conectar con Mercado Pago/i })).toBeInTheDocument();
     });
 
     it("abre Configuración cuando la URL trae ?tab=configuracion", async () => {

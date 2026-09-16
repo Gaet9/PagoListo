@@ -62,6 +62,7 @@ La integración de cobro en tienda usa la **API de Preferences** de Mercado Pago
 2. **Preferencia**: `POST /api/mercadopago/preference` usa el **access_token del vendedor** del negocio, crea la preferencia y un registro de intento (`mp_cobro_intentos`) con `external_reference` / metadata para el webhook.
 3. **Webhook**: `POST /api/mercadopago/webhook` notifica pagos; se valida el pago con la API MP y, si está **aprobado**, se crea la venta de forma idempotente (evitar duplicados por `mp_payment_id`).
 4. **UI**: pestaña **Cobrar** (QR), **Configuración** (conexión y cuenta), **Perfil** (resumen por negocio).
+5. **Errores de vinculación**: tras OAuth, la app vuelve con `mp_oauth=ok` o `mp_oauth=error` (mensajes en español). Ver [`docs/mercadopago-oauth-errores.md`](docs/mercadopago-oauth-errores.md).
 
 ### Configuración en Mercado Pago Developers
 
