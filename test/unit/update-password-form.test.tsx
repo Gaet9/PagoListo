@@ -15,6 +15,7 @@ const getSessionMock = vi.fn();
 const getUserMock = vi.fn();
 const updateUserMock = vi.fn();
 const exchangeCodeForSessionMock = vi.fn();
+const verifyOtpMock = vi.fn();
 const onAuthStateChangeMock = vi.fn();
 const replaceMock = vi.fn();
 
@@ -48,6 +49,7 @@ vi.mock("@/lib/supabase/client", () => ({
       updateUser: (...args: unknown[]) => updateUserMock(...args),
       exchangeCodeForSession: (...args: unknown[]) =>
         exchangeCodeForSessionMock(...args),
+      verifyOtp: (...args: unknown[]) => verifyOtpMock(...args),
       onAuthStateChange: (...args: unknown[]) => onAuthStateChangeMock(...args),
     },
   }),
@@ -59,6 +61,7 @@ describe("UpdatePasswordForm", () => {
     getUserMock.mockReset();
     updateUserMock.mockReset();
     exchangeCodeForSessionMock.mockReset();
+    verifyOtpMock.mockReset();
     onAuthStateChangeMock.mockReset();
     replaceMock.mockReset();
     onAuthStateChangeMock.mockReturnValue({
@@ -149,6 +152,37 @@ describe("UpdatePasswordForm", () => {
 
     await waitFor(() => {
       expect(exchangeCodeForSessionMock).toHaveBeenCalledWith("recovery-code");
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /guardar contraseña/i }),
+      ).not.toBeDisabled();
+    });
+
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it("verifica token_hash en el cliente antes de redirigir a confirm", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/update-password?token_hash=th&type=recovery",
+    );
+    stubLocationWithReplaceMock();
+    verifyOtpMock.mockResolvedValue({ error: null });
+    getSessionMock.mockResolvedValue({
+      data: { session: { user: { id: "user-1" } } },
+      error: null,
+    });
+
+    render(<UpdatePasswordForm />);
+
+    await waitFor(() => {
+      expect(verifyOtpMock).toHaveBeenCalledWith({
+        type: "recovery",
+        token_hash: "th",
+      });
     });
 
     await waitFor(() => {

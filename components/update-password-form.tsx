@@ -4,7 +4,9 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import {
   getRecoverySessionExchangePath,
+  getRecoveryTokenHashFromSearchParams,
   hasImplicitRecoveryHash,
+  hasPendingRecoveryExchangeInUrl,
   PASSWORD_RECOVERY_UPDATE_PATH,
   RECOVERY_EXCHANGE_REDIRECT_TIMEOUT_MS,
   RECOVERY_REDIRECT_FAILED_MESSAGE,
@@ -27,8 +29,11 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
 type SessionStatus = "loading" | "redirecting" | "ready" | "error";
+
+const RECOVERY_SESSION_POLL_MS = 100;
 
 export function UpdatePasswordForm({
   className,
@@ -53,6 +58,11 @@ export function UpdatePasswordForm({
     const searchParams = new URLSearchParams(window.location.search);
     const exchangePath = getRecoverySessionExchangePath(searchParams);
     const recoveryCode = searchParams.get("code");
+    const recoveryToken = getRecoveryTokenHashFromSearchParams(searchParams);
+    const pendingExchange = hasPendingRecoveryExchangeInUrl(
+      searchParams,
+      window.location.hash,
+    );
 
     const clearVerifyTimeout = () => {
       if (verifyTimeoutId !== undefined) {
@@ -98,11 +108,20 @@ export function UpdatePasswordForm({
       setSessionMessage(message);
     };
 
-    verifyTimeoutId = window.setTimeout(() => {
-      if (!cancelled && !sessionResolved) {
-        failSession(RECOVERY_SESSION_MISSING_MESSAGE);
-      }
-    }, RECOVERY_SESSION_VERIFY_TIMEOUT_MS);
+    const startVerifyTimeout = () => {
+      clearVerifyTimeout();
+      verifyTimeoutId = window.setTimeout(() => {
+        if (!cancelled && !sessionResolved) {
+          failSession(
+            pendingExchange
+              ? RECOVERY_SESSION_EXPIRED_MESSAGE
+              : RECOVERY_SESSION_MISSING_MESSAGE,
+          );
+        }
+      }, RECOVERY_SESSION_VERIFY_TIMEOUT_MS);
+    };
+
+    startVerifyTimeout();
 
     const waitForRedirectOrTimeout = (path: string) => {
       clearVerifyTimeout();
@@ -117,6 +136,13 @@ export function UpdatePasswordForm({
           resolve();
         }, RECOVERY_EXCHANGE_REDIRECT_TIMEOUT_MS);
       });
+    };
+
+    const waitForRecoverySession = async () => {
+      while (!cancelled && !sessionResolved) {
+        if (await resolveSession()) return;
+        await new Promise((resolve) => setTimeout(resolve, RECOVERY_SESSION_POLL_MS));
+      }
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -142,6 +168,17 @@ export function UpdatePasswordForm({
         }
       }
 
+      if (recoveryToken) {
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          type: recoveryToken.type as EmailOtpType,
+          token_hash: recoveryToken.tokenHash,
+        });
+        if (!cancelled && !verifyError && (await resolveSession())) {
+          window.history.replaceState({}, "", PASSWORD_RECOVERY_UPDATE_PATH);
+          return;
+        }
+      }
+
       if (exchangePath) {
         await waitForRedirectOrTimeout(exchangePath);
         return;
@@ -149,15 +186,14 @@ export function UpdatePasswordForm({
 
       if (await resolveSession()) return;
 
-      const waitingForHash = hasImplicitRecoveryHash(window.location.hash);
-
-      if (waitingForHash) {
-        for (let attempt = 0; attempt < 30; attempt += 1) {
-          if (cancelled) return;
-          if (await resolveSession()) return;
-          await new Promise((resolve) => setTimeout(resolve, 100));
+      if (
+        pendingExchange ||
+        hasImplicitRecoveryHash(window.location.hash)
+      ) {
+        await waitForRecoverySession();
+        if (!cancelled && !sessionResolved) {
+          failSession(RECOVERY_SESSION_EXPIRED_MESSAGE);
         }
-        failSession(RECOVERY_SESSION_EXPIRED_MESSAGE);
         return;
       }
 

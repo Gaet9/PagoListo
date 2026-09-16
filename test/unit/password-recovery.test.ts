@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildPasswordRecoveryRedirectTo,
   getRecoverySessionExchangePath,
+  getRecoveryTokenHashFromSearchParams,
   hasImplicitRecoveryHash,
+  hasPendingRecoveryExchangeInUrl,
 } from "@/lib/auth/password-recovery";
 
 describe("password-recovery", () => {
@@ -37,5 +39,38 @@ describe("password-recovery", () => {
       hasImplicitRecoveryHash("#access_token=x&type=recovery"),
     ).toBe(true);
     expect(hasImplicitRecoveryHash("")).toBe(false);
+  });
+
+  it("getRecoveryTokenHashFromSearchParams lee token_hash y type", () => {
+    const params = new URLSearchParams("token_hash=th&type=recovery");
+    expect(getRecoveryTokenHashFromSearchParams(params)).toEqual({
+      tokenHash: "th",
+      type: "recovery",
+    });
+    expect(getRecoveryTokenHashFromSearchParams(new URLSearchParams())).toBeNull();
+  });
+
+  it("hasPendingRecoveryExchangeInUrl detecta code, token_hash o hash", () => {
+    expect(
+      hasPendingRecoveryExchangeInUrl(
+        new URLSearchParams("code=abc"),
+        "",
+      ),
+    ).toBe(true);
+    expect(
+      hasPendingRecoveryExchangeInUrl(
+        new URLSearchParams("token_hash=t&type=recovery"),
+        "",
+      ),
+    ).toBe(true);
+    expect(
+      hasPendingRecoveryExchangeInUrl(
+        new URLSearchParams(),
+        "#type=recovery&access_token=x",
+      ),
+    ).toBe(true);
+    expect(
+      hasPendingRecoveryExchangeInUrl(new URLSearchParams(), ""),
+    ).toBe(false);
   });
 });

@@ -44,6 +44,31 @@ export function hasImplicitRecoveryHash(hash: string): boolean {
   );
 }
 
+/** `token_hash` + `type` en query (enlace de recuperación sin pasar por `/auth/confirm`). */
+export function getRecoveryTokenHashFromSearchParams(
+  searchParams: URLSearchParams,
+): { tokenHash: string; type: string } | null {
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
+  if (!tokenHash || !type) return null;
+  return { tokenHash, type };
+}
+
+/**
+ * Tras PR #13 (`redirectTo` = `/auth/update-password` sin query), el correo suele abrir
+ * esta ruta con `?code=`, `?token_hash=` o tokens en el hash; hay que intercambiar antes del formulario.
+ */
+export function hasPendingRecoveryExchangeInUrl(
+  searchParams: URLSearchParams,
+  hash: string,
+): boolean {
+  return (
+    Boolean(searchParams.get("code")) ||
+    getRecoveryTokenHashFromSearchParams(searchParams) !== null ||
+    hasImplicitRecoveryHash(hash)
+  );
+}
+
 export const RECOVERY_SESSION_MISSING_MESSAGE =
   "No hay una sesión de recuperación activa. Abrí el enlace del correo o pedí uno nuevo en «Olvidé mi contraseña».";
 
