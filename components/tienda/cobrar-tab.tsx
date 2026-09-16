@@ -7,7 +7,7 @@ import { BarcodeScannerDialog } from "@/components/tienda/barcode-scanner-dialog
 import { MercadoPagoOAuthStatusBanner } from "@/components/tienda/mercadopago-oauth-status-banner";
 import { MercadoPagoQr } from "@/components/tienda/mercadopago-qr";
 import { buildMercadoPagoOAuthStartPath } from "@/lib/mercadopago/oauth-start-url";
-import { mercadoPagoOAuthStatusErrorMessage } from "@/lib/mercadopago/fetch-oauth-status-client";
+import { fetchMercadoPagoOAuthStatus } from "@/lib/mercadopago/fetch-oauth-status-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -51,6 +51,12 @@ export function CobrarTab({ negocioId }: Props) {
     const [qrIntentoId, setQrIntentoId] = useState<string | null>(null);
     const [oauthReturnPath, setOauthReturnPath] = useState("/tiendas?tab=cobrar");
     const [configuracionHref, setConfiguracionHref] = useState("/tiendas?tab=configuracion");
+    /** null = aún no consultado; solo true habilita el método QR. */
+    const [mpConnectedForQr, setMpConnectedForQr] = useState<boolean | null>(null);
+
+    const handleMpConnectionChange = useCallback((connected: boolean) => {
+        setMpConnectedForQr(connected);
+    }, []);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -80,6 +86,11 @@ export function CobrarTab({ negocioId }: Props) {
         configParams.set("tab", "configuracion");
         setConfiguracionHref(`${window.location.pathname}?${configParams.toString()}`);
     }, []);
+
+    useEffect(() => {
+        if (mpConnectedForQr !== false || paymentMethod !== "qr") return;
+        setPaymentMethod(null);
+    }, [mpConnectedForQr, paymentMethod]);
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -141,17 +152,14 @@ export function CobrarTab({ negocioId }: Props) {
 
         (async () => {
             try {
-                const statusRes = await fetch(`/api/mercadopago/oauth/status?negocioId=${encodeURIComponent(negocioId)}`, {
-                    method: "GET",
-                    credentials: "same-origin",
-                });
-                const statusJson = (await statusRes.json().catch(() => ({}))) as { connected?: boolean; error?: string };
-                if (!statusRes.ok) {
-                    throw new Error(mercadoPagoOAuthStatusErrorMessage(statusRes.status, statusJson.error));
+                const statusResult = await fetchMercadoPagoOAuthStatus(negocioId);
+                if (!statusResult.ok) {
+                    throw new Error(statusResult.message);
                 }
 
-                const connected = !!statusJson.connected;
+                const connected = statusResult.status.connected;
                 if (!cancelled) setQrConnected(connected);
+                if (!cancelled) setMpConnectedForQr(connected);
 
                 if (!connected || cart.length === 0) return;
 
@@ -283,6 +291,7 @@ export function CobrarTab({ negocioId }: Props) {
                 oauthReturnPath={oauthReturnPath}
                 configuracionHref={configuracionHref}
                 variant='cobrar'
+                onConnectionChange={handleMpConnectionChange}
             />
 
             <section className='rounded-lg border bg-card p-4 flex flex-col gap-3'>
@@ -447,7 +456,16 @@ export function CobrarTab({ negocioId }: Props) {
                         onClick={() => setPaymentMethod("cash")}>
                         Efectivo
                     </Button>
-                    <Button type='button' variant={paymentMethod === "qr" ? "default" : "outline"} onClick={() => setPaymentMethod("qr")}>
+                    <Button
+                        type='button'
+                        variant={paymentMethod === "qr" ? "default" : "outline"}
+                        disabled={mpConnectedForQr !== true}
+                        title={
+                            mpConnectedForQr === false ?
+                                "Conectá Mercado Pago arriba para cobrar con QR"
+                            :   undefined
+                        }
+                        onClick={() => setPaymentMethod("qr")}>
                         Mercado Pago (QR)
                     </Button>
                     <Button
@@ -457,6 +475,12 @@ export function CobrarTab({ negocioId }: Props) {
                         Transferencia
                     </Button>
                 </div>
+
+                {mpConnectedForQr === false ?
+                    <p className='text-xs text-muted-foreground'>
+                        Mercado Pago está desvinculada. Usá «Conectar con Mercado Pago» en el recuadro de arriba para habilitar el QR.
+                    </p>
+                :   null}
 
                 {paymentMethod === "cash" ?
                     <div className='pt-2 flex justify-end'>
