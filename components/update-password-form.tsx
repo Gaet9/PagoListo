@@ -3,7 +3,10 @@
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import {
-  getRecoverySessionExchangePath,
+  establishRecoverySession,
+  RECOVERY_SESSION_VERIFY_TIMEOUT_MS,
+} from "@/lib/auth/establish-recovery-session";
+import {
   hasImplicitRecoveryHash,
   RECOVERY_SESSION_EXPIRED_MESSAGE,
   RECOVERY_SESSION_MISSING_MESSAGE,
@@ -36,13 +39,6 @@ export function UpdatePasswordForm({
   const router = useRouter();
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const exchangePath = getRecoverySessionExchangePath(searchParams);
-    if (exchangePath) {
-      window.location.replace(exchangePath);
-      return;
-    }
-
     let cancelled = false;
     const supabase = createClient();
 
@@ -65,6 +61,12 @@ export function UpdatePasswordForm({
       setSessionMessage(message);
     };
 
+    const verifyTimeout = window.setTimeout(() => {
+      if (!cancelled) {
+        failSession(RECOVERY_SESSION_EXPIRED_MESSAGE);
+      }
+    }, RECOVERY_SESSION_VERIFY_TIMEOUT_MS);
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event) => {
         if (
@@ -78,9 +80,38 @@ export function UpdatePasswordForm({
     );
 
     void (async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const hash = window.location.hash;
+
+      const outcome = await establishRecoverySession(
+        supabase,
+        searchParams,
+        hash,
+      );
+
+      if (cancelled) return;
+
+      if (outcome.kind === "ready") {
+        if (await resolveSession()) return;
+        failSession(RECOVERY_SESSION_MISSING_MESSAGE);
+        return;
+      }
+
+      if (outcome.kind === "error") {
+        failSession(outcome.message);
+        return;
+      }
+
+      if (outcome.kind === "redirect") {
+        window.location.replace(outcome.path);
+        return;
+      }
+
       if (await resolveSession()) return;
 
-      const waitingForHash = hasImplicitRecoveryHash(window.location.hash);
+      const waitingForHash =
+        outcome.kind === "wait_for_implicit_hash" ||
+        hasImplicitRecoveryHash(hash);
 
       if (waitingForHash) {
         for (let attempt = 0; attempt < 30; attempt += 1) {
@@ -92,14 +123,14 @@ export function UpdatePasswordForm({
         return;
       }
 
-      const hasSession = await resolveSession();
-      if (!hasSession && !cancelled) {
+      if (!cancelled) {
         failSession(RECOVERY_SESSION_MISSING_MESSAGE);
       }
     })();
 
     return () => {
       cancelled = true;
+      window.clearTimeout(verifyTimeout);
       authListener.subscription.unsubscribe();
     };
   }, []);
