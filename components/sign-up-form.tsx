@@ -1,6 +1,7 @@
 "use client";
 
 import { validateNewPasswordStrength } from "@/lib/auth/password-policy";
+import { startGoogleOAuthSignIn } from "@/lib/auth/start-google-oauth";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export function SignUpForm({
   className,
@@ -26,24 +27,25 @@ export function SignUpForm({
   const [repeatPassword, setRepeatPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleRedirecting, setIsGoogleRedirecting] = useState(false);
+  const googleOAuthStartedRef = useRef(false);
   const router = useRouter();
 
+  const authBusy = isLoading || isGoogleRedirecting;
+
   const handleGoogleOAuth = async () => {
-    const supabase = createClient();
-    setIsLoading(true);
+    if (googleOAuthStartedRef.current || authBusy) return;
+    googleOAuthStartedRef.current = true;
+    setIsGoogleRedirecting(true);
     setError(null);
 
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/perfil`,
-        },
-      });
-      if (error) throw error;
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Ocurrió un error");
-      setIsLoading(false);
+    const supabase = createClient();
+    const result = await startGoogleOAuthSignIn(supabase, { nextPath: "/perfil" });
+
+    if (!result.ok) {
+      googleOAuthStartedRef.current = false;
+      setIsGoogleRedirecting(false);
+      setError(result.message);
     }
   };
 
@@ -102,6 +104,7 @@ export function SignUpForm({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={authBusy}
                 />
               </div>
               <div className="grid gap-2">
@@ -112,6 +115,7 @@ export function SignUpForm({
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={authBusy}
                 />
               </div>
               <div className="grid gap-2">
@@ -122,10 +126,11 @@ export function SignUpForm({
                   required
                   value={repeatPassword}
                   onChange={(e) => setRepeatPassword(e.target.value)}
+                  disabled={authBusy}
                 />
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={authBusy}>
                 {isLoading ? "Creando cuenta…" : "Registrarse"}
               </Button>
               <div className="relative">
@@ -143,10 +148,10 @@ export function SignUpForm({
                   type="button"
                   variant="outline"
                   className="w-full"
-                  disabled={isLoading}
+                  disabled={authBusy}
                   onClick={handleGoogleOAuth}
                 >
-                  Continuar con Google
+                  {isGoogleRedirecting ? "Redirigiendo a Google…" : "Continuar con Google"}
                 </Button>
               </div>
             </div>

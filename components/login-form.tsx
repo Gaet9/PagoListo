@@ -14,8 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { getSafeInternalNextPath } from "@/lib/auth/safe-next-path";
+import { startGoogleOAuthSignIn } from "@/lib/auth/start-google-oauth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function LoginForm({
   className,
@@ -25,7 +26,9 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleRedirecting, setIsGoogleRedirecting] = useState(false);
   const [afterLoginPath, setAfterLoginPath] = useState("/perfil");
+  const googleOAuthStartedRef = useRef(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -33,28 +36,23 @@ export function LoginForm({
     setAfterLoginPath(getSafeInternalNextPath(params.get("next")));
   }, []);
 
+  const authBusy = isLoading || isGoogleRedirecting;
+
   const handleGoogleOAuth = async () => {
-    const supabase = createClient();
-    setIsLoading(true);
+    if (googleOAuthStartedRef.current || authBusy) return;
+    googleOAuthStartedRef.current = true;
+    setIsGoogleRedirecting(true);
     setError(null);
 
-    try {
-      const next = encodeURIComponent(afterLoginPath);
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${next}`,
-        },
-      });
-      if (error) throw error;
-      if (data?.url) {
-        window.location.assign(data.url);
-        return;
-      }
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Ocurrió un error");
-    } finally {
-      setIsLoading(false);
+    const supabase = createClient();
+    const result = await startGoogleOAuthSignIn(supabase, {
+      nextPath: afterLoginPath,
+    });
+
+    if (!result.ok) {
+      googleOAuthStartedRef.current = false;
+      setIsGoogleRedirecting(false);
+      setError(result.message);
     }
   };
 
@@ -99,6 +97,7 @@ export function LoginForm({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={authBusy}
                 />
               </div>
               <div className="grid gap-2">
@@ -117,10 +116,11 @@ export function LoginForm({
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={authBusy}
                 />
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={authBusy}>
                 {isLoading ? "Entrando…" : "Entrar"}
               </Button>
               <div className="relative">
@@ -138,10 +138,10 @@ export function LoginForm({
                   type="button"
                   variant="outline"
                   className="w-full"
-                  disabled={isLoading}
+                  disabled={authBusy}
                   onClick={handleGoogleOAuth}
                 >
-                  Continuar con Google
+                  {isGoogleRedirecting ? "Redirigiendo a Google…" : "Continuar con Google"}
                 </Button>
               </div>
             </div>
