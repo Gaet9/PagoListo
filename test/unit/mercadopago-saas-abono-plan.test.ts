@@ -25,9 +25,11 @@ describe("resolveSaasAbonoPlan", () => {
     expect(() => resolveSaasAbonoPlan("anual")).toThrow(/no válido/i);
   });
 
-  it("rejects placeholder monthly price 100 ARS", () => {
+  it("accepts 100 ARS as a valid QA test price", () => {
     process.env.PAGOLISTO_SAAS_PLAN_MENSUAL_ARS = "100";
-    expect(() => resolveSaasAbonoPlan("mensual")).toThrow(/placeholder/i);
+    const plan = resolveSaasAbonoPlan("mensual");
+    expect(plan.unitPriceArs).toBe(100);
+    expect(plan.code).toBe("mensual");
   });
 
   it("throws when monthly price env is missing", () => {
