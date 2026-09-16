@@ -31,13 +31,21 @@ export async function sendTransactionalEmail(
   }
 
   const client = getResendClient();
-  const result = await client.emails.send({
-    from: from ?? getResendFromAddress(),
-    to,
-    subject,
-    ...(text ? { text } : {}),
-    ...(html ? { html } : {}),
-  });
+  const fromAddress = from ?? getResendFromAddress();
+  const result = html
+    ? await client.emails.send({
+        from: fromAddress,
+        to,
+        subject,
+        html,
+        ...(text ? { text } : {}),
+      })
+    : await client.emails.send({
+        from: fromAddress,
+        to,
+        subject,
+        text: text!,
+      });
 
   if (result.error) {
     return { ok: false, message: result.error.message };
