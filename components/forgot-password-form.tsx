@@ -13,26 +13,25 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getForgotPasswordErrorMessage } from "@/lib/auth/forgot-password-error-message";
 import {
   FORGOT_PASSWORD_SENT_SEARCH_PARAM,
+  forgotPasswordSentFromSearchParam,
   markForgotPasswordEmailRequested,
   readForgotPasswordEmailRequestedFromSession,
 } from "@/lib/auth/forgot-password-sent-state";
 
-type ForgotPasswordFormProps = React.ComponentPropsWithoutRef<"div"> & {
-  /** Éxito persistido vía `?sent=1` (sobrevive remounts por refresh de sesión). */
-  sentFromUrl?: boolean;
-};
-
 export function ForgotPasswordForm({
   className,
-  sentFromUrl = false,
   ...props
-}: ForgotPasswordFormProps) {
+}: React.ComponentPropsWithoutRef<"div">) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const sentFromUrl = forgotPasswordSentFromSearchParam(
+    searchParams.get(FORGOT_PASSWORD_SENT_SEARCH_PARAM) ?? undefined,
+  );
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(sentFromUrl);
