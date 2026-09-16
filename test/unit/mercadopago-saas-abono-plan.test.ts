@@ -21,7 +21,17 @@ describe("resolveSaasAbonoPlan", () => {
   });
 
   it("rejects unknown plan codes", () => {
-    process.env.PAGOLISTO_SAAS_PLAN_MENSUAL_ARS = "100";
+    process.env.PAGOLISTO_SAAS_PLAN_MENSUAL_ARS = "9990";
     expect(() => resolveSaasAbonoPlan("anual")).toThrow(/no válido/i);
+  });
+
+  it("rejects placeholder monthly price 100 ARS", () => {
+    process.env.PAGOLISTO_SAAS_PLAN_MENSUAL_ARS = "100";
+    expect(() => resolveSaasAbonoPlan("mensual")).toThrow(/placeholder/i);
+  });
+
+  it("throws when monthly price env is missing", () => {
+    delete process.env.PAGOLISTO_SAAS_PLAN_MENSUAL_ARS;
+    expect(() => resolveSaasAbonoPlan("mensual")).toThrow(/not set/i);
   });
 });
