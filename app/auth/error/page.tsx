@@ -1,3 +1,4 @@
+import { getOAuthCallbackErrorMessage } from "@/lib/auth/oauth-error-message";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Suspense } from "react";
 
@@ -12,7 +13,7 @@ async function ErrorContent({
     <>
       {params?.error ? (
         <p className="text-sm text-muted-foreground">
-          Detalle: {params.error}
+          {getOAuthCallbackErrorMessage(params.error)}
         </p>
       ) : (
         <p className="text-sm text-muted-foreground">
