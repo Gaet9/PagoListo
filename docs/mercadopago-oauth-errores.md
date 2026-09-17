@@ -46,4 +46,4 @@ Constante compartida con el cliente UI: `MERCADOPAGO_OAUTH_UNLINK_API_PATH` en `
 
 Respuesta segura (sin tokens): `{ "ok": true }` con HTTP 200 (también si ya estaba desvinculado).
 
-Re-vincular / otra cuenta (#28): unlink, luego `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…&forceAccountSelect=1` (authorize con `prompt=login` best-effort). Primer vínculo: sin `forceAccountSelect`.
+Re-vincular / otra cuenta: `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…&reconnect=1` (servidor desvincula + `prompt=login` best-effort). Primer vínculo: sin `reconnect`.

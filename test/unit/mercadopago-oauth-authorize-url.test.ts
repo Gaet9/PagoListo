@@ -31,7 +31,7 @@ describe("buildMercadoPagoAuthorizeUrl", () => {
     expect(url.searchParams.has("prompt")).toBe(false);
   });
 
-  it("con forceAccountSelection agrega prompt=login", () => {
+  it("con reconnect agrega prompt=login", () => {
     vi.stubEnv("MERCADOPAGO_OAUTH_CLIENT_ID", "1234567890123456");
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://www.pagolisto.com.ar");
     vi.stubEnv("MERCADOPAGO_OAUTH_REDIRECT_URI", "");
@@ -40,7 +40,7 @@ describe("buildMercadoPagoAuthorizeUrl", () => {
       buildMercadoPagoAuthorizeUrl({
         state: "abc123",
         codeChallenge: "challenge-value",
-        forceAccountSelection: true,
+        reconnect: true,
       }),
     );
 

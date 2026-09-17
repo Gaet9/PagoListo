@@ -2,11 +2,7 @@
 
 import { MercadoPagoDesvincularDialog } from "@/components/tienda/mercadopago-desvincular-dialog";
 import { Button } from "@/components/ui/button";
-import { beginMercadoPagoConnectAnotherAccount } from "@/lib/mercadopago/oauth-connect-another-client";
-import { resolveMercadoPagoOAuthReturnPath } from "@/lib/mercadopago/oauth-start-url";
-import { Loader2 } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { buildMercadoPagoOAuthStartPath, resolveMercadoPagoOAuthReturnPath } from "@/lib/mercadopago/oauth-start-url";
 
 type Props = {
     negocioId: string;
@@ -30,16 +26,10 @@ export function MercadoPagoVinculacionCtas({
     size = "default",
 }: Props) {
     const btnSize = size === "sm" ? "sm" : "default";
-    const [connectingAnother, setConnectingAnother] = useState(false);
 
-    const connectAnother = async () => {
-        setConnectingAnother(true);
+    const startReconnectOAuth = () => {
         const redirectTo = oauthReturnPath?.trim() || resolveMercadoPagoOAuthReturnPath();
-        const result = await beginMercadoPagoConnectAnotherAccount(negocioId, redirectTo);
-        setConnectingAnother(false);
-        if (!result.ok) {
-            toast.error("No se pudo cambiar de cuenta", { description: result.message });
-        }
+        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, redirectTo, { reconnect: true });
     };
 
     if (!connected) {
@@ -47,7 +37,7 @@ export function MercadoPagoVinculacionCtas({
             preferReconnectCopy ? "Vincular otra cuenta"
             : "Conectar con Mercado Pago";
         return (
-            <Button type='button' size={btnSize} onClick={onConnect}>
+            <Button type='button' size={btnSize} onClick={preferReconnectCopy ? startReconnectOAuth : onConnect}>
                 {label}
             </Button>
         );
@@ -55,18 +45,8 @@ export function MercadoPagoVinculacionCtas({
 
     return (
         <div className='flex flex-wrap gap-2'>
-            <Button
-                type='button'
-                size={btnSize}
-                variant='secondary'
-                disabled={connectingAnother}
-                onClick={() => void connectAnother()}>
-                {connectingAnother ?
-                    <>
-                        <Loader2 className='mr-2 h-4 w-4 animate-spin' aria-hidden />
-                        Preparando…
-                    </>
-                :   "Vincular otra cuenta"}
+            <Button type='button' size={btnSize} variant='secondary' onClick={startReconnectOAuth}>
+                Vincular otra cuenta
             </Button>
             <MercadoPagoDesvincularDialog negocioId={negocioId} onUnlinked={onUnlinked} size={size} />
         </div>

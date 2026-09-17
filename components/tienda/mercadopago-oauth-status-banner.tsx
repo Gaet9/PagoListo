@@ -66,8 +66,8 @@ export function MercadoPagoOAuthStatusBanner({
         if (flash?.kind === "ok") void load();
     }, [load]);
 
-    const startConnect = () => {
-        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, oauthReturnPath);
+    const startConnect = (options?: { reconnect?: boolean }) => {
+        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, oauthReturnPath, options);
     };
 
     const connected = !!status?.connected;
@@ -91,7 +91,7 @@ export function MercadoPagoOAuthStatusBanner({
                         <Button type='button' size='sm' variant='outline' className='h-8' onClick={() => void load()}>
                             Reintentar
                         </Button>
-                        <Button type='button' size='sm' className='h-8' onClick={startConnect}>
+                        <Button type='button' size='sm' className='h-8' onClick={() => startConnect({ reconnect: true })}>
                             Reconectar
                         </Button>
                     </div>

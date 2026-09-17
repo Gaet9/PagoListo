@@ -50,17 +50,21 @@ Parámetros (ver `lib/mercadopago/oauth.ts` → `buildMercadoPagoAuthorizeUrl`):
 | `state` | aleatorio (un solo uso, ~10 min) |
 | `scope` | `offline_access payments write` |
 | `code_challenge` / `code_challenge_method` | PKCE **S256** (siempre enviados) |
-| `prompt` | Solo si start trae `forceAccountSelect=1` (UX #28): `login` — **no documentado por MP** (best-effort) |
+| `prompt` | Solo si start trae `reconnect=1`: `login` — **no documentado por MP** (best-effort) |
 
-### `forceAccountSelect=1` en oauth/start (complemento server de #28)
+### `reconnect=1` en oauth/start (otra cuenta MP)
 
-Cliente (Fran, `beginMercadoPagoConnectAnotherAccount`): unlink → `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…&forceAccountSelect=1`.
+```http
+GET /api/mercadopago/oauth/start?negocioId=<uuid>&redirectTo=<path>&reconnect=1
+```
 
-El handler **no** desvincula de nuevo; solo lee el query param y pasa `forceAccountSelection` a `buildMercadoPagoAuthorizeUrl`, que añade `prompt=login` al authorize. Sin el flag, el authorize es idéntico al primer vínculo.
+Cliente (Fran): `buildMercadoPagoOAuthStartPath(negocioId, redirectTo, { reconnect: true })` — **no** hace unlink en el browser; el servidor desvincula.
 
-MP no documenta `prompt`, `max_age` ni logout OAuth. Si la sesión del navegador sigue en la misma cuenta: cerrar sesión en MP o incógnito.
+Con `reconnect=1`, antes de PKCE/state: `disconnectNegocioMercadoPagoOAuth` (revoke best-effort + borrado Supabase). Luego authorize con `prompt=login`. Sin el flag: primer vínculo, sin disconnect ni `prompt`.
 
-Parser compartido: `lib/mercadopago/oauth-force-account-select.ts`.
+MP no documenta `prompt` ni logout OAuth. Fallback: cerrar sesión en MP o incógnito.
+
+Parser: `lib/mercadopago/oauth-reconnect.ts`.
 
 **Ejemplo** (secretos enmascarados):
 

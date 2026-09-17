@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getMercadoPagoOAuthStartConfigWarnings } from "@/lib/mercadopago/oauth-credential-hints";
 import { getMercadoPagoOAuthRedirectUriMismatchWarning } from "@/lib/mercadopago/oauth-redirect-uri";
+import { disconnectNegocioMercadoPagoOAuth } from "@/lib/mercadopago/disconnect-negocio-oauth";
 import { buildMercadoPagoAuthorizeUrl, newOAuthState, newPkceCodeVerifier, pkceChallengeS256 } from "@/lib/mercadopago/oauth";
-import { isMercadoPagoOAuthForceAccountSelectRequested } from "@/lib/mercadopago/oauth-force-account-select";
+import { isMercadoPagoOAuthReconnectRequested } from "@/lib/mercadopago/oauth-reconnect";
 import { areEquivalentSiteOrigins, getConfiguredSiteOrigin } from "@/lib/mercadopago/oauth-site-host";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -44,9 +45,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const negocioId = url.searchParams.get("negocioId")?.trim();
   const redirectTo = sanitizeRedirectTo(request, url.searchParams.get("redirectTo"));
-  const forceAccountSelect = isMercadoPagoOAuthForceAccountSelectRequested(
-    url.searchParams.get("forceAccountSelect"),
-  );
+  const reconnect = isMercadoPagoOAuthReconnectRequested(url.searchParams.get("reconnect"));
 
   if (!negocioId) return badRequest("Falta negocioId");
 
@@ -67,6 +66,14 @@ export async function GET(request: NextRequest) {
     .single();
   if (negocioErr || !negocio) {
     return NextResponse.json({ error: "Negocio no encontrado o sin permisos" }, { status: 404 });
+  }
+
+  if (reconnect) {
+    const disconnect = await disconnectNegocioMercadoPagoOAuth(negocioId);
+    if (!disconnect.ok) {
+      console.error("[mp-oauth/start] reconnect disconnect failed", negocioId);
+      return serverError();
+    }
   }
 
   const state = newOAuthState();
@@ -99,7 +106,7 @@ export async function GET(request: NextRequest) {
   const authUrl = buildMercadoPagoAuthorizeUrl({
     state,
     codeChallenge,
-    forceAccountSelection: forceAccountSelect,
+    reconnect,
   });
   return NextResponse.redirect(authUrl);
 }

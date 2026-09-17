@@ -5,7 +5,7 @@ import crypto from "crypto";
 import {
   MERCADOPAGO_OAUTH_AUTHORIZE_PROMPT_LOGIN,
   MERCADOPAGO_OAUTH_AUTHORIZE_PROMPT_PARAM,
-} from "@/lib/mercadopago/oauth-force-account-select";
+} from "@/lib/mercadopago/oauth-reconnect";
 import { getMercadoPagoOAuthRedirectUri } from "@/lib/mercadopago/oauth-redirect-uri";
 
 export type MercadoPagoOAuthTokenResponse = {
@@ -56,8 +56,8 @@ export function pkceChallengeS256(verifier: string): string {
 export function buildMercadoPagoAuthorizeUrl(input: {
   state: string;
   codeChallenge?: string;
-  /** true cuando oauth/start recibe `forceAccountSelect=1` (UX #28). */
-  forceAccountSelection?: boolean;
+  /** true cuando oauth/start recibe `reconnect=1`. */
+  reconnect?: boolean;
 }) {
   const url = new URL("https://auth.mercadopago.com/authorization");
   url.searchParams.set("client_id", getMercadoPagoOAuthClientId());
@@ -70,7 +70,7 @@ export function buildMercadoPagoAuthorizeUrl(input: {
     url.searchParams.set("code_challenge", input.codeChallenge);
     url.searchParams.set("code_challenge_method", "S256");
   }
-  if (input.forceAccountSelection) {
+  if (input.reconnect) {
     url.searchParams.set(MERCADOPAGO_OAUTH_AUTHORIZE_PROMPT_PARAM, MERCADOPAGO_OAUTH_AUTHORIZE_PROMPT_LOGIN);
   }
   return url.toString();
