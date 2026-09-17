@@ -120,6 +120,7 @@ export function ConfiguracionTab({ negocioId }: Props) {
                         <MercadoPagoVinculacionCtas
                             negocioId={negocioId}
                             connected={connected}
+                            oauthReturnPath={resolveMercadoPagoOAuthReturnPath()}
                             preferReconnectCopy={preferReconnect}
                             onConnect={startOAuth}
                             onUnlinked={() => {

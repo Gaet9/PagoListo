@@ -120,6 +120,7 @@ export function MercadoPagoOAuthStatusBanner({
                         <MercadoPagoVinculacionCtas
                             negocioId={negocioId}
                             connected={false}
+                            oauthReturnPath={oauthReturnPath}
                             preferReconnectCopy={preferReconnect}
                             onConnect={startConnect}
                             onUnlinked={() => void load()}
@@ -203,6 +204,7 @@ export function MercadoPagoOAuthStatusBanner({
                     <MercadoPagoVinculacionCtas
                         negocioId={negocioId}
                         connected={false}
+                        oauthReturnPath={oauthReturnPath}
                         preferReconnectCopy={preferReconnect}
                         onConnect={startConnect}
                         onUnlinked={() => void load()}
