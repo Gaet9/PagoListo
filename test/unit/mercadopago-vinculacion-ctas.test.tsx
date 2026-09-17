@@ -1,10 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 import { MercadoPagoVinculacionCtas } from "@/components/tienda/mercadopago-vinculacion-ctas";
 
 describe("MercadoPagoVinculacionCtas", () => {
-    const originalFetch = globalThis.fetch;
     const originalLocation = window.location;
 
     beforeEach(() => {
@@ -12,15 +11,10 @@ describe("MercadoPagoVinculacionCtas", () => {
     });
 
     afterEach(() => {
-        globalThis.fetch = originalFetch;
         vi.unstubAllGlobals();
     });
 
-    it("Vincular otra cuenta desvincula y abre OAuth con reconnect=1", async () => {
-        globalThis.fetch = vi.fn(async (): Promise<Response> => {
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as typeof fetch;
-
+    it("Vincular otra cuenta navega a start con reconnect=1", () => {
         render(
             <MercadoPagoVinculacionCtas
                 negocioId='n1'
@@ -33,8 +27,7 @@ describe("MercadoPagoVinculacionCtas", () => {
 
         fireEvent.click(screen.getByRole("button", { name: /Vincular otra cuenta/i }));
 
-        await waitFor(() => {
-            expect(window.location.href).toContain("reconnect=1");
-        });
+        expect(window.location.href).toContain("reconnect=1");
+        expect(window.location.href).not.toContain("forceAccountSelect");
     });
 });

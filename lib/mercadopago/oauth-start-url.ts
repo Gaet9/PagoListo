@@ -1,7 +1,10 @@
-export type MercadoPagoOAuthStartPathOptions = {
-    /** GAE-37: contrato con `/api/mercadopago/oauth/start` (`reconnect=1` → re-login MP; ver PR #29). */
-    reconnect?: boolean;
-};
+import {
+  MERCADOPAGO_OAUTH_RECONNECT_QUERY_PARAM,
+  MERCADOPAGO_OAUTH_RECONNECT_QUERY_VALUE,
+  type MercadoPagoOAuthStartPathOptions,
+} from "@/lib/mercadopago/oauth-reconnect";
+
+export type { MercadoPagoOAuthStartPathOptions };
 
 /** Ruta same-site de retorno tras OAuth (pestaña / path actual con `tab` por defecto). */
 export function resolveMercadoPagoOAuthReturnPath(fallback = "/tiendas?tab=configuracion"): string {
@@ -15,6 +18,8 @@ export function resolveMercadoPagoOAuthReturnPath(fallback = "/tiendas?tab=confi
 
 /**
  * Path del servidor que inicia OAuth (PKCE + state). Usar en el cliente con `window.location.href`.
+ *
+ * Otra cuenta MP: `…&reconnect=1` (el servidor desvincula + `prompt=login` en authorize).
  */
 export function buildMercadoPagoOAuthStartPath(
     negocioId: string,
@@ -30,7 +35,7 @@ export function buildMercadoPagoOAuthStartPath(
         redirectTo: target,
     });
     if (options?.reconnect) {
-        qs.set("reconnect", "1");
+        qs.set(MERCADOPAGO_OAUTH_RECONNECT_QUERY_PARAM, MERCADOPAGO_OAUTH_RECONNECT_QUERY_VALUE);
     }
     return `/api/mercadopago/oauth/start?${qs.toString()}`;
 }
