@@ -34,8 +34,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Negocio no encontrado o sin permisos" }, { status: 404 });
   }
 
-  const result = await disconnectNegocioMercadoPagoOAuth(negocioId);
+  const result = await disconnectNegocioMercadoPagoOAuth(negocioId, { strictRevoke: true });
   if (!result.ok) {
+    console.error("[mp-oauth/unlink] strictRevoke failed", negocioId, result.reason);
     return NextResponse.json({ error: "No se pudo desvincular Mercado Pago. Reintentá en unos minutos." }, { status: 500 });
   }
 

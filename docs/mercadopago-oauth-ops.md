@@ -56,7 +56,7 @@ Parámetros (ver `lib/mercadopago/oauth.ts` → `buildMercadoPagoAuthorizeUrl`):
 
 ### Otra cuenta MP — flujo producto (#35, 2 toques)
 
-1. **Desvincular** — UI: `MercadoPagoDesvincularDialog` → `POST /api/mercadopago/oauth/unlink` (revoke best-effort + delete en servidor).
+1. **Desvincular** — UI: `MercadoPagoDesvincularDialog` → `POST /api/mercadopago/oauth/unlink` (**strictRevoke** / fail-closed si había token + delete en servidor).
 2. **Vincular** — `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…` **sin** `reconnect=1` (PKCE + authorize normal, sin `prompt=login`).
 
 La UI **no** envía `reconnect=1` ni one-shot unlink+start en un solo gesto.
@@ -67,7 +67,7 @@ La UI **no** envía `reconnect=1` ni one-shot unlink+start en un solo gesto.
 GET /api/mercadopago/oauth/start?negocioId=<uuid>&redirectTo=<path>&reconnect=1
 ```
 
-No es el flujo producto tras #35. Si se invoca explícitamente (p. ej. integraciones o herramientas): **antes** de PKCE/state, `disconnectNegocioMercadoPagoOAuth` con **fail-closed** si había `access_token` — revocación MP OK o 404 **antes** de borrar Supabase; fallo → HTTP 500, sin redirect a authorize. Luego authorize con `prompt=login` (best-effort; no documentado por MP). `POST …/oauth/unlink` sigue siendo best-effort en revoke.
+No es el flujo producto tras #35. Si se invoca explícitamente (p. ej. integraciones o herramientas): **antes** de PKCE/state, `disconnectNegocioMercadoPagoOAuth` con **fail-closed** si había `access_token` — revocación MP OK o 404 **antes** de borrar Supabase; fallo → HTTP 500, sin redirect a authorize. Luego authorize con `prompt=login` (best-effort; no documentado por MP). La respuesta redirect incluye headers de debug no secretos (`X-PagoListo-Mp-Oauth-*`) y log `[mp-oauth/start] reconnect authorize`. El unlink producto usa el mismo **strictRevoke** que reconnect start.
 
 **Limitación de sesión en el navegador:** la [documentación OAuth de MP](https://www.mercadopago.com.ar/developers/en/docs/security/oauth/management) no publica URL de logout para integradores en `auth.mercadopago.com`. PagoListo **no** usa URLs no documentadas. Si MP sigue reutilizando la cuenta logueada en el browser, el usuario debe cerrar sesión en mercadopago.com o usar una ventana privada. Código: `lib/mercadopago/oauth-mp-browser-session.ts`.
 
