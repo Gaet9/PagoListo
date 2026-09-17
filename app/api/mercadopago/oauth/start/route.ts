@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getMercadoPagoOAuthStartConfigWarnings } from "@/lib/mercadopago/oauth-credential-hints";
 import { getMercadoPagoOAuthRedirectUriMismatchWarning } from "@/lib/mercadopago/oauth-redirect-uri";
 import { disconnectNegocioMercadoPagoOAuth } from "@/lib/mercadopago/disconnect-negocio-oauth";
+import { resolveMercadoPagoOAuthReconnectBrowserRedirect } from "@/lib/mercadopago/oauth-mp-browser-session";
 import { buildMercadoPagoAuthorizeUrl, newOAuthState, newPkceCodeVerifier, pkceChallengeS256 } from "@/lib/mercadopago/oauth";
 import { isMercadoPagoOAuthReconnectRequested } from "@/lib/mercadopago/oauth-reconnect";
 import { areEquivalentSiteOrigins, getConfiguredSiteOrigin } from "@/lib/mercadopago/oauth-site-host";
@@ -69,9 +70,12 @@ export async function GET(request: NextRequest) {
   }
 
   if (reconnect) {
-    const disconnect = await disconnectNegocioMercadoPagoOAuth(negocioId);
+    // Revoke MP + delete Supabase must finish before PKCE/state and authorize redirect.
+    const disconnect = await disconnectNegocioMercadoPagoOAuth(negocioId, {
+      failClosedWhenStoredTokensExist: true,
+    });
     if (!disconnect.ok) {
-      console.error("[mp-oauth/start] reconnect disconnect failed", negocioId);
+      console.error("[mp-oauth/start] reconnect disconnect failed", negocioId, disconnect.reason);
       return serverError();
     }
   }
@@ -108,6 +112,7 @@ export async function GET(request: NextRequest) {
     codeChallenge,
     reconnect,
   });
-  return NextResponse.redirect(authUrl);
+  const browserRedirect = reconnect ? resolveMercadoPagoOAuthReconnectBrowserRedirect(authUrl) : authUrl;
+  return NextResponse.redirect(browserRedirect);
 }
 
