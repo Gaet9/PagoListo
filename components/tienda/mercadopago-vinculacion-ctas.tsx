@@ -8,6 +8,11 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+export type MercadoPagoVinculacionConnectOptions = {
+    /** Añade `reconnect=1` en oauth/start (el caller debe desvincular antes si sigue conectado). */
+    reconnect?: boolean;
+};
+
 type Props = {
     negocioId: string;
     connected: boolean;
@@ -15,7 +20,7 @@ type Props = {
     oauthReturnPath?: string;
     /** Tras desvincular o fallo previo, usar copy de reconexión. */
     preferReconnectCopy?: boolean;
-    onConnect: () => void;
+    onConnect: (options?: MercadoPagoVinculacionConnectOptions) => void;
     onUnlinked: () => void;
     size?: "default" | "sm";
 };
@@ -31,6 +36,7 @@ export function MercadoPagoVinculacionCtas({
 }: Props) {
     const btnSize = size === "sm" ? "sm" : "default";
     const [connectingAnother, setConnectingAnother] = useState(false);
+    const wantsReconnect = connected || !!preferReconnectCopy;
 
     const connectAnother = async () => {
         setConnectingAnother(true);
@@ -47,7 +53,10 @@ export function MercadoPagoVinculacionCtas({
             preferReconnectCopy ? "Vincular otra cuenta"
             : "Conectar con Mercado Pago";
         return (
-            <Button type='button' size={btnSize} onClick={onConnect}>
+            <Button
+                type='button'
+                size={btnSize}
+                onClick={() => onConnect(wantsReconnect ? { reconnect: true } : undefined)}>
                 {label}
             </Button>
         );

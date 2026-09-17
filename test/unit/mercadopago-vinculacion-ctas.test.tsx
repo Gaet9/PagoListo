@@ -16,7 +16,7 @@ describe("MercadoPagoVinculacionCtas", () => {
         vi.unstubAllGlobals();
     });
 
-    it("Vincular otra cuenta desvincula y abre OAuth con forceAccountSelect", async () => {
+    it("Vincular otra cuenta desvincula y abre OAuth con reconnect=1", async () => {
         globalThis.fetch = vi.fn(async (): Promise<Response> => {
             return new Response(JSON.stringify({}), { status: 200 });
         }) as typeof fetch;
@@ -34,7 +34,7 @@ describe("MercadoPagoVinculacionCtas", () => {
         fireEvent.click(screen.getByRole("button", { name: /Vincular otra cuenta/i }));
 
         await waitFor(() => {
-            expect(window.location.href).toContain("forceAccountSelect=1");
+            expect(window.location.href).toContain("reconnect=1");
         });
     });
 });

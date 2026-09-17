@@ -1,6 +1,6 @@
 export type MercadoPagoOAuthStartPathOptions = {
-    /** GAE-37: contrato con `/api/mercadopago/oauth/start` (Rodrigo wirea MP authorize). */
-    forceAccountSelect?: boolean;
+    /** GAE-37: contrato con `/api/mercadopago/oauth/start` (`reconnect=1` → re-login MP; ver PR #29). */
+    reconnect?: boolean;
 };
 
 /** Ruta same-site de retorno tras OAuth (pestaña / path actual con `tab` por defecto). */
@@ -29,8 +29,8 @@ export function buildMercadoPagoOAuthStartPath(
         negocioId,
         redirectTo: target,
     });
-    if (options?.forceAccountSelect) {
-        qs.set("forceAccountSelect", "1");
+    if (options?.reconnect) {
+        qs.set("reconnect", "1");
     }
     return `/api/mercadopago/oauth/start?${qs.toString()}`;
 }

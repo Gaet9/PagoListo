@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { fetchMercadoPagoOAuthStatus } from "@/lib/mercadopago/fetch-oauth-status-client";
 import { MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT } from "@/lib/mercadopago/mp-connect-another-copy";
-import { buildMercadoPagoOAuthStartPath } from "@/lib/mercadopago/oauth-start-url";
+import { buildMercadoPagoOAuthStartPath, type MercadoPagoOAuthStartPathOptions } from "@/lib/mercadopago/oauth-start-url";
 import { parseMpOAuthFlashFromSearchParams } from "@/lib/mercadopago/oauth-return";
 import type { MercadoPagoOAuthStatusResponse } from "@/lib/types/mercadopago-oauth-status";
 import { useCallback, useEffect, useState } from "react";
@@ -66,8 +66,8 @@ export function MercadoPagoOAuthStatusBanner({
         if (flash?.kind === "ok") void load();
     }, [load]);
 
-    const startConnect = () => {
-        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, oauthReturnPath);
+    const startConnect = (options?: MercadoPagoOAuthStartPathOptions) => {
+        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, oauthReturnPath, options);
     };
 
     const connected = !!status?.connected;
@@ -91,7 +91,7 @@ export function MercadoPagoOAuthStatusBanner({
                         <Button type='button' size='sm' variant='outline' className='h-8' onClick={() => void load()}>
                             Reintentar
                         </Button>
-                        <Button type='button' size='sm' className='h-8' onClick={startConnect}>
+                        <Button type='button' size='sm' className='h-8' onClick={() => startConnect({ reconnect: true })}>
                             Reconectar
                         </Button>
                     </div>
@@ -166,7 +166,7 @@ export function MercadoPagoOAuthStatusBanner({
                         <Button type='button' size='sm' variant='outline' onClick={() => void load()}>
                             Reintentar
                         </Button>
-                        <Button type='button' size='sm' onClick={startConnect}>
+                        <Button type='button' size='sm' onClick={() => startConnect({ reconnect: true })}>
                             Reconectar
                         </Button>
                     </div>

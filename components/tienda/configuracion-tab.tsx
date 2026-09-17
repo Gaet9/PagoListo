@@ -9,7 +9,11 @@ import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-shell";
 import { Spinner } from "@/components/ui/spinner";
 import { fetchMercadoPagoOAuthStatus } from "@/lib/mercadopago/fetch-oauth-status-client";
-import { buildMercadoPagoOAuthStartPath, resolveMercadoPagoOAuthReturnPath } from "@/lib/mercadopago/oauth-start-url";
+import {
+    buildMercadoPagoOAuthStartPath,
+    resolveMercadoPagoOAuthReturnPath,
+    type MercadoPagoOAuthStartPathOptions,
+} from "@/lib/mercadopago/oauth-start-url";
 import { MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT } from "@/lib/mercadopago/mp-connect-another-copy";
 import { parseMpOAuthFlashFromSearchParams } from "@/lib/mercadopago/oauth-return";
 import type { MercadoPagoOAuthStatusResponse } from "@/lib/types/mercadopago-oauth-status";
@@ -46,8 +50,8 @@ export function ConfiguracionTab({ negocioId }: Props) {
         if (flash?.kind === "ok") void load();
     }, [load]);
 
-    const startOAuth = () => {
-        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, resolveMercadoPagoOAuthReturnPath());
+    const startOAuth = (options?: MercadoPagoOAuthStartPathOptions) => {
+        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, resolveMercadoPagoOAuthReturnPath(), options);
     };
 
     const connected = !!status?.connected;
@@ -77,7 +81,7 @@ export function ConfiguracionTab({ negocioId }: Props) {
                             <Button type='button' size='sm' variant='outline' onClick={() => void load()}>
                                 Reintentar
                             </Button>
-                            <Button type='button' size='sm' onClick={startOAuth}>
+                            <Button type='button' size='sm' onClick={() => startOAuth({ reconnect: true })}>
                                 Reconectar
                             </Button>
                         </div>

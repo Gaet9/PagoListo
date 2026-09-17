@@ -15,7 +15,7 @@ describe("beginMercadoPagoConnectAnotherAccount", () => {
         vi.unstubAllGlobals();
     });
 
-    it("desvincula y navega a start con forceAccountSelect=1", async () => {
+    it("desvincula y navega a start con reconnect=1", async () => {
         globalThis.fetch = vi.fn(async (): Promise<Response> => {
             return new Response(JSON.stringify({ ok: true }), { status: 200 });
         }) as typeof fetch;
@@ -29,7 +29,7 @@ describe("beginMercadoPagoConnectAnotherAccount", () => {
         );
         expect(window.location.href).toContain("/api/mercadopago/oauth/start");
         expect(window.location.href).toContain("negocioId=neg-1");
-        expect(window.location.href).toContain("forceAccountSelect=1");
+        expect(window.location.href).toContain("reconnect=1");
         expect(window.location.href).toContain("redirectTo=%2Ftiendas%3Ftab%3Dcobrar");
     });
 
