@@ -28,5 +28,22 @@ describe("buildMercadoPagoAuthorizeUrl", () => {
     );
     expect(url.searchParams.get("code_challenge")).toBe("challenge-value");
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(url.searchParams.has("prompt")).toBe(false);
+  });
+
+  it("con reconnect agrega prompt=login", () => {
+    vi.stubEnv("MERCADOPAGO_OAUTH_CLIENT_ID", "1234567890123456");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://www.pagolisto.com.ar");
+    vi.stubEnv("MERCADOPAGO_OAUTH_REDIRECT_URI", "");
+
+    const url = new URL(
+      buildMercadoPagoAuthorizeUrl({
+        state: "abc123",
+        codeChallenge: "challenge-value",
+        reconnect: true,
+      }),
+    );
+
+    expect(url.searchParams.get("prompt")).toBe("login");
   });
 });

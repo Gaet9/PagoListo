@@ -46,8 +46,12 @@ export function ConfiguracionTab({ negocioId }: Props) {
         if (flash?.kind === "ok") void load();
     }, [load]);
 
-    const startOAuth = () => {
-        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, resolveMercadoPagoOAuthReturnPath());
+    const startOAuth = (options?: { reconnect?: boolean }) => {
+        window.location.href = buildMercadoPagoOAuthStartPath(
+            negocioId,
+            resolveMercadoPagoOAuthReturnPath(),
+            options,
+        );
     };
 
     const connected = !!status?.connected;
@@ -77,7 +81,7 @@ export function ConfiguracionTab({ negocioId }: Props) {
                             <Button type='button' size='sm' variant='outline' onClick={() => void load()}>
                                 Reintentar
                             </Button>
-                            <Button type='button' size='sm' onClick={startOAuth}>
+                            <Button type='button' size='sm' onClick={() => startOAuth({ reconnect: true })}>
                                 Reconectar
                             </Button>
                         </div>

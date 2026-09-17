@@ -50,6 +50,21 @@ Parámetros (ver `lib/mercadopago/oauth.ts` → `buildMercadoPagoAuthorizeUrl`):
 | `state` | aleatorio (un solo uso, ~10 min) |
 | `scope` | `offline_access payments write` |
 | `code_challenge` / `code_challenge_method` | PKCE **S256** (siempre enviados) |
+| `prompt` | Solo si start trae `reconnect=1`: `login` — **no documentado por MP** (best-effort) |
+
+### `reconnect=1` en oauth/start (otra cuenta MP)
+
+```http
+GET /api/mercadopago/oauth/start?negocioId=<uuid>&redirectTo=<path>&reconnect=1
+```
+
+Cliente (Fran): `buildMercadoPagoOAuthStartPath(negocioId, redirectTo, { reconnect: true })` — **no** hace unlink en el browser; el servidor desvincula.
+
+Con `reconnect=1`, antes de PKCE/state: `disconnectNegocioMercadoPagoOAuth` (revoke best-effort + borrado Supabase). Luego authorize con `prompt=login`. Sin el flag: primer vínculo, sin disconnect ni `prompt`.
+
+MP no documenta `prompt` ni logout OAuth. Fallback: cerrar sesión en MP o incógnito.
+
+Parser: `lib/mercadopago/oauth-reconnect.ts`.
 
 **Ejemplo** (secretos enmascarados):
 
