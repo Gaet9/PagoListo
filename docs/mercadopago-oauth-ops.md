@@ -66,6 +66,8 @@ MP no documenta `prompt` ni logout OAuth. Fallback: cerrar sesión en MP o incó
 
 Parser: `lib/mercadopago/oauth-reconnect.ts`.
 
+**Alias deprecado (un release):** `forceAccountSelect=1` (#28) se trata igual que `reconnect=1`. Cliente nuevo (#30): solo `reconnect=1` / `onConnect({ reconnect: true })`.
+
 **Ejemplo** (secretos enmascarados):
 
 ```http

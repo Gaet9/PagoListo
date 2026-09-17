@@ -4,7 +4,7 @@ import { getMercadoPagoOAuthStartConfigWarnings } from "@/lib/mercadopago/oauth-
 import { getMercadoPagoOAuthRedirectUriMismatchWarning } from "@/lib/mercadopago/oauth-redirect-uri";
 import { disconnectNegocioMercadoPagoOAuth } from "@/lib/mercadopago/disconnect-negocio-oauth";
 import { buildMercadoPagoAuthorizeUrl, newOAuthState, newPkceCodeVerifier, pkceChallengeS256 } from "@/lib/mercadopago/oauth";
-import { isMercadoPagoOAuthReconnectRequested } from "@/lib/mercadopago/oauth-reconnect";
+import { isMercadoPagoOAuthStartReconnectMode } from "@/lib/mercadopago/oauth-reconnect";
 import { areEquivalentSiteOrigins, getConfiguredSiteOrigin } from "@/lib/mercadopago/oauth-site-host";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -45,7 +45,10 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const negocioId = url.searchParams.get("negocioId")?.trim();
   const redirectTo = sanitizeRedirectTo(request, url.searchParams.get("redirectTo"));
-  const reconnect = isMercadoPagoOAuthReconnectRequested(url.searchParams.get("reconnect"));
+  const reconnect = isMercadoPagoOAuthStartReconnectMode({
+    reconnect: url.searchParams.get("reconnect"),
+    forceAccountSelect: url.searchParams.get("forceAccountSelect"),
+  });
 
   if (!negocioId) return badRequest("Falta negocioId");
 
