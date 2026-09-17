@@ -13,4 +13,10 @@ describe("buildMercadoPagoOAuthStartPath", () => {
         const path = buildMercadoPagoOAuthStartPath("neg-2", "/tiendas?tab=configuracion");
         expect(path).toContain("redirectTo=%2Ftiendas%3Ftab%3Dconfiguracion");
     });
+
+    it("incluye forceAccountSelect=1 cuando se pide cambio de cuenta", () => {
+        const path = buildMercadoPagoOAuthStartPath("neg-3", "/perfil", { forceAccountSelect: true });
+        expect(path).toContain("forceAccountSelect=1");
+        expect(path).toContain("negocioId=neg-3");
+    });
 });
