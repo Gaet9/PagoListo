@@ -4,7 +4,7 @@ import { MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT } from "@/lib/mercadopago/mp-c
 
 describe("MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT", () => {
     it("menciona elegir otra cuenta, limitación MP y fallback ventana privada", () => {
-        expect(MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT).toMatch(/otra cuenta/i);
+        expect(MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT).toMatch(/Vincular otra cuenta|otra cuenta/i);
         expect(MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT).toMatch(/ventana privada/i);
         expect(MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT).toMatch(/mercadopago\.com/i);
     });
