@@ -25,7 +25,7 @@ describe("ConfiguracionTab", () => {
     it("muestra CTA de conexión sin pasos explicativos", async () => {
         render(<ConfiguracionTab negocioId='n1' />);
         await waitFor(() => {
-            expect(screen.getByRole("button", { name: /Conectar con Mercado Pago/i })).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: /^Vincular$/i })).toBeInTheDocument();
         });
         expect(screen.queryByText(/Tocá «Conectar/i)).not.toBeInTheDocument();
     });

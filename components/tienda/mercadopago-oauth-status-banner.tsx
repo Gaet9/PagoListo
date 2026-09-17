@@ -37,7 +37,6 @@ export function MercadoPagoOAuthStatusBanner({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<MercadoPagoOAuthStatusResponse | null>(null);
-    const [wasConnected, setWasConnected] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -52,7 +51,6 @@ export function MercadoPagoOAuthStatusBanner({
         }
         setStatus(result.status);
         onConnectionChange?.(result.status.connected);
-        if (result.status.connected) setWasConnected(true);
     }, [negocioId, onConnectionChange]);
 
     useEffect(() => {
@@ -70,7 +68,6 @@ export function MercadoPagoOAuthStatusBanner({
     };
 
     const connected = !!status?.connected;
-    const showVincularLabel = wasConnected && !connected;
 
     if (variant === "compact") {
         return (
@@ -91,7 +88,7 @@ export function MercadoPagoOAuthStatusBanner({
                             Reintentar
                         </Button>
                         <Button type='button' size='sm' className='h-8' onClick={startConnect}>
-                            Conectar
+                            Vincular
                         </Button>
                     </div>
                 : connected ?
@@ -101,17 +98,13 @@ export function MercadoPagoOAuthStatusBanner({
                             negocioId={negocioId}
                             connected
                             onConnect={startConnect}
-                            onUnlinked={() => {
-                                setWasConnected(true);
-                                void load();
-                            }}
+                            onUnlinked={() => void load()}
                             size='sm'
                         />
                     </div>
                 :   <MercadoPagoVinculacionCtas
                         negocioId={negocioId}
                         connected={false}
-                        vincularLabel={showVincularLabel}
                         onConnect={startConnect}
                         onUnlinked={() => void load()}
                         size='sm'
@@ -157,7 +150,7 @@ export function MercadoPagoOAuthStatusBanner({
                             Reintentar
                         </Button>
                         <Button type='button' size='sm' onClick={startConnect}>
-                            Conectar
+                            Vincular
                         </Button>
                     </div>
                 </div>
@@ -168,16 +161,12 @@ export function MercadoPagoOAuthStatusBanner({
                         negocioId={negocioId}
                         connected
                         onConnect={startConnect}
-                        onUnlinked={() => {
-                            setWasConnected(true);
-                            void load();
-                        }}
+                        onUnlinked={() => void load()}
                     />
                 </div>
             :   <MercadoPagoVinculacionCtas
                     negocioId={negocioId}
                     connected={false}
-                    vincularLabel={showVincularLabel}
                     onConnect={startConnect}
                     onUnlinked={() => void load()}
                 />

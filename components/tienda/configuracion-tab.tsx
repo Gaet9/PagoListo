@@ -19,7 +19,6 @@ export function ConfiguracionTab({ negocioId }: Props) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<MercadoPagoOAuthStatusResponse | null>(null);
-    const [wasConnected, setWasConnected] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -32,7 +31,6 @@ export function ConfiguracionTab({ negocioId }: Props) {
             return;
         }
         setStatus(result.status);
-        if (result.status.connected) setWasConnected(true);
     }, [negocioId]);
 
     useEffect(() => {
@@ -53,7 +51,6 @@ export function ConfiguracionTab({ negocioId }: Props) {
     };
 
     const connected = !!status?.connected;
-    const showVincularLabel = wasConnected && !connected;
 
     return (
         <div className='flex flex-col gap-6'>
@@ -76,7 +73,7 @@ export function ConfiguracionTab({ negocioId }: Props) {
                                 Reintentar
                             </Button>
                             <Button type='button' size='sm' onClick={startOAuth}>
-                                Conectar
+                                Vincular
                             </Button>
                         </div>
                     </div>
@@ -98,12 +95,8 @@ export function ConfiguracionTab({ negocioId }: Props) {
                         <MercadoPagoVinculacionCtas
                             negocioId={negocioId}
                             connected={connected}
-                            vincularLabel={showVincularLabel}
                             onConnect={startOAuth}
-                            onUnlinked={() => {
-                                setWasConnected(true);
-                                void load();
-                            }}
+                            onUnlinked={() => void load()}
                         />
                     </div>
                 :   null}

@@ -58,7 +58,7 @@ describe("NegocioMercadoPagoStatus", () => {
         render(<NegocioMercadoPagoStatus negocioId='n1' configuracionHref='/tiendas/foo?tab=configuracion' />);
 
         await waitFor(() => {
-            expect(screen.getByRole("button", { name: /Conectar con Mercado Pago/i })).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: /^Vincular$/i })).toBeInTheDocument();
         });
     });
 });

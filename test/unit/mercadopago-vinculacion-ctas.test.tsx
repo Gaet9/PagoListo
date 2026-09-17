@@ -16,9 +16,10 @@ describe("MercadoPagoVinculacionCtas", () => {
 
         expect(screen.getByRole("button", { name: /Desvincular/i })).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: /Vincular otra cuenta/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /^Vincular$/i })).not.toBeInTheDocument();
     });
 
-    it("desvinculada: Conectar con Mercado Pago llama onConnect", () => {
+    it("desvinculada: Vincular llama onConnect", () => {
         const onConnect = vi.fn();
         render(
             <MercadoPagoVinculacionCtas
@@ -29,21 +30,7 @@ describe("MercadoPagoVinculacionCtas", () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole("button", { name: /Conectar con Mercado Pago/i }));
+        fireEvent.click(screen.getByRole("button", { name: /^Vincular$/i }));
         expect(onConnect).toHaveBeenCalledOnce();
-    });
-
-    it("desvinculada tras unlink: etiqueta Vincular", () => {
-        render(
-            <MercadoPagoVinculacionCtas
-                negocioId='n1'
-                connected={false}
-                vincularLabel
-                onConnect={() => {}}
-                onUnlinked={() => {}}
-            />,
-        );
-
-        expect(screen.getByRole("button", { name: /^Vincular$/i })).toBeInTheDocument();
     });
 });
