@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getMercadoPagoOAuthStartConfigWarnings } from "@/lib/mercadopago/oauth-credential-hints";
 import { getMercadoPagoOAuthRedirectUriMismatchWarning } from "@/lib/mercadopago/oauth-redirect-uri";
 import { buildMercadoPagoAuthorizeUrl, newOAuthState, newPkceCodeVerifier, pkceChallengeS256 } from "@/lib/mercadopago/oauth";
+import { isMercadoPagoOAuthForceAccountSelectRequested } from "@/lib/mercadopago/oauth-force-account-select";
 import { areEquivalentSiteOrigins, getConfiguredSiteOrigin } from "@/lib/mercadopago/oauth-site-host";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -43,6 +44,9 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const negocioId = url.searchParams.get("negocioId")?.trim();
   const redirectTo = sanitizeRedirectTo(request, url.searchParams.get("redirectTo"));
+  const forceAccountSelect = isMercadoPagoOAuthForceAccountSelectRequested(
+    url.searchParams.get("forceAccountSelect"),
+  );
 
   if (!negocioId) return badRequest("Falta negocioId");
 
@@ -92,7 +96,11 @@ export async function GET(request: NextRequest) {
     console.error(warning);
   }
 
-  const authUrl = buildMercadoPagoAuthorizeUrl({ state, codeChallenge });
+  const authUrl = buildMercadoPagoAuthorizeUrl({
+    state,
+    codeChallenge,
+    forceAccountSelection: forceAccountSelect,
+  });
   return NextResponse.redirect(authUrl);
 }
 

@@ -50,6 +50,17 @@ Parámetros (ver `lib/mercadopago/oauth.ts` → `buildMercadoPagoAuthorizeUrl`):
 | `state` | aleatorio (un solo uso, ~10 min) |
 | `scope` | `offline_access payments write` |
 | `code_challenge` / `code_challenge_method` | PKCE **S256** (siempre enviados) |
+| `prompt` | Solo si start trae `forceAccountSelect=1` (UX #28): `login` — **no documentado por MP** (best-effort) |
+
+### `forceAccountSelect=1` en oauth/start (complemento server de #28)
+
+Cliente (Fran, `beginMercadoPagoConnectAnotherAccount`): unlink → `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…&forceAccountSelect=1`.
+
+El handler **no** desvincula de nuevo; solo lee el query param y pasa `forceAccountSelection` a `buildMercadoPagoAuthorizeUrl`, que añade `prompt=login` al authorize. Sin el flag, el authorize es idéntico al primer vínculo.
+
+MP no documenta `prompt`, `max_age` ni logout OAuth. Si la sesión del navegador sigue en la misma cuenta: cerrar sesión en MP o incógnito.
+
+Parser compartido: `lib/mercadopago/oauth-force-account-select.ts`.
 
 **Ejemplo** (secretos enmascarados):
 
