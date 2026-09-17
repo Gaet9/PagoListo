@@ -60,9 +60,9 @@ GET /api/mercadopago/oauth/start?negocioId=<uuid>&redirectTo=<path>&reconnect=1
 
 Cliente (Fran): `buildMercadoPagoOAuthStartPath(negocioId, redirectTo, { reconnect: true })` — **no** hace unlink en el browser; el servidor desvincula.
 
-Con `reconnect=1`, antes de PKCE/state: `disconnectNegocioMercadoPagoOAuth` (revoke best-effort + borrado Supabase). Luego authorize con `prompt=login`. Sin el flag: primer vínculo, sin disconnect ni `prompt`.
+Con `reconnect=1`, **antes** de PKCE/state: `disconnectNegocioMercadoPagoOAuth` con **fail-closed** si había `access_token` guardado — la revocación en MP (`DELETE /users/{id}/applications/{client_id}`) debe responder OK (o 404) **antes** de borrar Supabase; si falla, oauth/start responde 500 y **no** redirige a authorize. Unlink manual (`POST …/oauth/unlink`) sigue siendo best-effort en revoke. Luego authorize con `prompt=login` (no documentado por MP).
 
-MP no documenta `prompt` ni logout OAuth. Fallback: cerrar sesión en MP o incógnito.
+**Limitación de sesión en el navegador:** la [documentación OAuth de MP](https://www.mercadopago.com.ar/developers/en/docs/security/oauth/management) no publica URL de logout para integradores en `auth.mercadopago.com`. PagoListo **no** usa URLs no documentadas. Si tras revoke server-side MP sigue reutilizando la cuenta logueada en el browser, el usuario debe cerrar sesión en mercadopago.com o usar ventana privada (`MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT`). Código: `lib/mercadopago/oauth-mp-browser-session.ts`.
 
 Parser: `lib/mercadopago/oauth-reconnect.ts`.
 

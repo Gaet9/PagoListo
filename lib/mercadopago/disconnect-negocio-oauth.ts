@@ -1,15 +1,28 @@
 import "server-only";
 
 import { getMercadoPagoOAuthClientId } from "@/lib/mercadopago/oauth";
+import { reconnectDisconnectBlockedByMpRevoke } from "@/lib/mercadopago/oauth-reconnect";
 import { revokeMercadoPagoAuthorizationBestEffort as revokeMpBestEffort } from "@/lib/mercadopago/oauth-revoke-best-effort";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+export type DisconnectNegocioMercadoPagoOptions = {
+  /**
+   * Reconnect (`reconnect=1`): si había `access_token` guardado, exige revocación MP exitosa
+   * antes de borrar filas locales. Si falla, no se borra la vinculación (fail closed).
+   */
+  failClosedWhenStoredTokensExist?: boolean;
+};
+
 export type DisconnectNegocioMercadoPagoResult =
   | { ok: true; wasConnected: boolean; mpRevokeAttempted: boolean; mpRevokeOk: boolean }
-  | { ok: false; reason: "delete_failed" };
+  | { ok: false; reason: "delete_failed" | "mp_revoke_failed" };
 
 /** Server-only: remove stored OAuth credentials and pending OAuth states for a negocio. */
-export async function disconnectNegocioMercadoPagoOAuth(negocioId: string): Promise<DisconnectNegocioMercadoPagoResult> {
+export async function disconnectNegocioMercadoPagoOAuth(
+  negocioId: string,
+  options?: DisconnectNegocioMercadoPagoOptions,
+): Promise<DisconnectNegocioMercadoPagoResult> {
+  const failClosed = options?.failClosedWhenStoredTokensExist === true;
   const admin = createAdminClient();
 
   const { data: row, error: readErr } = await admin
@@ -30,14 +43,20 @@ export async function disconnectNegocioMercadoPagoOAuth(negocioId: string): Prom
 
   let mpRevokeAttempted = false;
   let mpRevokeOk = false;
-  if (typeof row.access_token === "string" && row.access_token.trim().length > 0) {
+  const storedAccessToken = row.access_token;
+
+  if (typeof storedAccessToken === "string" && storedAccessToken.trim().length > 0) {
     mpRevokeAttempted = true;
     mpRevokeOk = await revokeMpBestEffort({
-      accessToken: row.access_token,
+      accessToken: storedAccessToken,
       mpUserId: typeof row.mp_user_id === "number" ? row.mp_user_id : null,
       clientId: getMercadoPagoOAuthClientId(),
     });
-    if (!mpRevokeOk) {
+    if (reconnectDisconnectBlockedByMpRevoke({ storedAccessToken, mpRevokeAttempted, mpRevokeOk })) {
+      if (failClosed) {
+        console.error("[mp-oauth/disconnect] reconnect fail-closed: MP revoke did not succeed", negocioId);
+        return { ok: false, reason: "mp_revoke_failed" };
+      }
       console.warn("[mp-oauth/disconnect] MP deauthorize best-effort did not succeed; clearing local tokens anyway");
     }
   }
