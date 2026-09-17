@@ -2,6 +2,48 @@
 
 Checklist para Gaétan / Armando al configurar la app en [Mercado Pago Developers](https://www.mercadopago.com.ar/developers) y variables en Vercel.
 
+## Dos aplicaciones MP (no mezclar credenciales)
+
+PagoListo usa **dos apps distintas** en Mercado Pago Developers:
+
+| Rol | Variables Vercel | Panel MP |
+| --- | --- | --- |
+| **Abono SaaS** (Checkout Pro con token de la plataforma) | `MERCADOPAGO_ACCESS_TOKEN_SAAS`, `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY_SAAS` | App de facturación PagoListo; webhooks del abono |
+| **OAuth / cobro en tienda** (vincular cuenta del comercio) | `MERCADOPAGO_OAUTH_CLIENT_ID`, `MERCADOPAGO_OAUTH_CLIENT_SECRET` | App de integración tienda; **Redirect URI** + PKCE si está habilitado |
+
+Errores típicos si se mezclan:
+
+- Poner la **Public Key** o el **Access Token SaaS** en `MERCADOPAGO_OAUTH_CLIENT_ID` / `SECRET` → MP muestra *«Lo sentimos, la aplicación no puede conectarse a tu cuenta»* **sin pantalla de login**.
+- Usar credenciales de la app **SaaS** (sin Redirect URI de OAuth registrado) para el flujo **Conectar MP** en Configuración.
+- Credenciales de **usuarios de prueba** / app en modo prueba con vendedores **productivos** (o al revés).
+
+`MERCADOPAGO_OAUTH_CLIENT_ID` debe ser el **número de aplicación** (App ID) de la app OAuth/cobro, visible en *Detalles de la aplicación* — no el prefijo `APP_USR-` del access token.
+
+## Cómo arma PagoListo la URL de authorize
+
+El servidor redirige a MP desde `GET /api/mercadopago/oauth/start` (tras sesión Supabase y guardar state + PKCE en `mp_oauth_states`).
+
+Parámetros (ver `lib/mercadopago/oauth.ts` → `buildMercadoPagoAuthorizeUrl`):
+
+| Parámetro | Valor |
+| --- | --- |
+| Host | `https://auth.mercadopago.com/authorization` |
+| `client_id` | `MERCADOPAGO_OAUTH_CLIENT_ID` |
+| `response_type` | `code` |
+| `platform_id` | `mp` |
+| `redirect_uri` | `getMercadoPagoOAuthRedirectUri()` (ver abajo) |
+| `state` | aleatorio (un solo uso, ~10 min) |
+| `scope` | `offline_access payments write` |
+| `code_challenge` / `code_challenge_method` | PKCE **S256** (siempre enviados) |
+
+**Ejemplo** (secretos enmascarados):
+
+```http
+https://auth.mercadopago.com/authorization?client_id=************3456&response_type=code&platform_id=mp&redirect_uri=https%3A%2F%2Fwww.pagolisto.com.ar%2Fapi%2Fmercadopago%2Foauth%2Fcallback&state=a1b2c3…&scope=offline_access+payments+write&code_challenge=E9Melhoa2OwvFrEMTgu…&code_challenge_method=S256
+```
+
+Para inspeccionar en producción: DevTools → pestaña **Red** → clic en «Conectar MP» → respuesta `302` de `/api/mercadopago/oauth/start` → header `Location` (ahí está el `redirect_uri` real que ve MP).
+
 ## URL canónica del sitio
 
 - **`NEXT_PUBLIC_SITE_URL`**: usar el host **final** donde vive la app con sesión Supabase, en producción:
@@ -20,6 +62,8 @@ Registrar **exactamente** (sin barra final extra) las URLs de callback que vayan
 | Ngrok / preview | `https://<túnel>/api/mercadopago/oauth/callback` |
 
 Opcional: fijar explícitamente en Vercel **`MERCADOPAGO_OAUTH_REDIRECT_URI`** igual al valor registrado en MP (debe coincidir byte a byte con el authorize).
+
+**Prioridad en código:** si `MERCADOPAGO_OAUTH_REDIRECT_URI` está definida (aunque sea distinta de `NEXT_PUBLIC_SITE_URL`), **el authorize usa solo el override**. Un override viejo (localhost, ngrok, apex sin registrar) con `NEXT_PUBLIC_SITE_URL` en www produce el error de MP antes del login. Tras cambiar env en Vercel, **redeploy**; si usás `NEXT_PUBLIC_SITE_URL` para derivar el callback, también hace falta rebuild porque es `NEXT_PUBLIC_*`.
 
 ## Variables de entorno (OAuth tienda)
 
@@ -41,7 +85,22 @@ Opcional: fijar explícitamente en Vercel **`MERCADOPAGO_OAUTH_REDIRECT_URI`** i
 ## Scopes y PKCE
 
 - Authorize usa **`offline_access payments write`** + **PKCE S256** (state de un solo uso en `mp_oauth_states`).
+- En el panel MP: si habilitaste **Authorization code con PKCE**, los campos `code_challenge` / `code_method` son obligatorios (PagoListo ya los envía).
 - Tras conectar, validar en **Configuración** o `GET /api/mercadopago/oauth/status?negocioId=…` → `connected: true` (sin tokens en la respuesta).
+
+## «La aplicación no puede conectarse a tu cuenta» (pantalla de MP, sin login)
+
+Este mensaje aparece **en Mercado Pago**, antes de volver a PagoListo. No es un `mp_oauth=error` de nuestra app. Según [documentación MP](https://developers.mercadolibre.com.ar/es_ar/autenticacion-y-autorizacion), revisar en orden:
+
+1. **`redirect_uri`** en la URL de authorize = **exactamente** una URL registrada en *URLs de redireccionamiento* (protocolo, host, ruta, sin query; sin barra final de más). Producción esperada: `https://www.pagolisto.com.ar/api/mercadopago/oauth/callback`.
+2. **`client_id` / `client_secret`** válidos y de la **app OAuth tienda** (no SaaS).
+3. Vendedor entra con la **cuenta principal**, no colaborador.
+4. Cuenta vendedor o titular de la app sin validaciones pendientes / inhabilitaciones.
+5. **Prod vs prueba:** app y cuentas en el mismo modo (no autorizar producción con app de prueba).
+
+Si el authorize en `Location` muestra un `redirect_uri` distinto al panel MP, corregir Vercel (`MERCADOPAGO_OAUTH_REDIRECT_URI` o `NEXT_PUBLIC_SITE_URL` + rebuild) y el panel MP, luego redeploy.
+
+Los logs de Vercel en `/api/mercadopago/oauth/start` incluyen `[mp-oauth] MERCADOPAGO_OAUTH_REDIRECT_URI … no alinea` cuando el override contradice `NEXT_PUBLIC_SITE_URL`.
 
 ## Errores recuperables
 
