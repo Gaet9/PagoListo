@@ -15,7 +15,7 @@ export async function unlinkMercadoPagoOAuth(negocioId: string): Promise<UnlinkM
             ok: false,
             notImplemented: true,
             message:
-                "Todavía no está habilitada la desvinculación en el servidor. Mientras tanto, usá «Vincular otra cuenta» para cambiar la cuenta de Mercado Pago, o probá «Desvincular» de nuevo más tarde.",
+                "Todavía no está habilitada la desvinculación en el servidor. Probá «Desvincular» de nuevo más tarde.",
         };
     }
     if (!res.ok) {

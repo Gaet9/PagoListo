@@ -8,7 +8,6 @@ import { MercadoPagoVinculacionCtas } from "@/components/tienda/mercadopago-vinc
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { fetchMercadoPagoOAuthStatus } from "@/lib/mercadopago/fetch-oauth-status-client";
-import { MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT } from "@/lib/mercadopago/mp-connect-another-copy";
 import { buildMercadoPagoOAuthStartPath } from "@/lib/mercadopago/oauth-start-url";
 import { parseMpOAuthFlashFromSearchParams } from "@/lib/mercadopago/oauth-return";
 import type { MercadoPagoOAuthStatusResponse } from "@/lib/types/mercadopago-oauth-status";
@@ -38,7 +37,6 @@ export function MercadoPagoOAuthStatusBanner({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<MercadoPagoOAuthStatusResponse | null>(null);
-    const [wasConnected, setWasConnected] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -53,7 +51,6 @@ export function MercadoPagoOAuthStatusBanner({
         }
         setStatus(result.status);
         onConnectionChange?.(result.status.connected);
-        if (result.status.connected) setWasConnected(true);
     }, [negocioId, onConnectionChange]);
 
     useEffect(() => {
@@ -66,12 +63,11 @@ export function MercadoPagoOAuthStatusBanner({
         if (flash?.kind === "ok") void load();
     }, [load]);
 
-    const startConnect = (options?: { reconnect?: boolean }) => {
-        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, oauthReturnPath, options);
+    const startConnect = () => {
+        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, oauthReturnPath);
     };
 
     const connected = !!status?.connected;
-    const preferReconnect = wasConnected && !connected;
 
     if (variant === "compact") {
         return (
@@ -91,42 +87,28 @@ export function MercadoPagoOAuthStatusBanner({
                         <Button type='button' size='sm' variant='outline' className='h-8' onClick={() => void load()}>
                             Reintentar
                         </Button>
-                        <Button type='button' size='sm' className='h-8' onClick={() => startConnect({ reconnect: true })}>
-                            Reconectar
+                        <Button type='button' size='sm' className='h-8' onClick={startConnect}>
+                            Vincular
                         </Button>
                     </div>
                 : connected ?
                     <div className='space-y-2'>
-                        <p className='text-xs text-muted-foreground'>{MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT}</p>
                         <MercadoPagoCuentaDetalles status={status!} size='sm' />
                         <MercadoPagoVinculacionCtas
                             negocioId={negocioId}
                             connected
-                            oauthReturnPath={oauthReturnPath}
-                            onConnect={startConnect}
-                            onUnlinked={() => {
-                                setWasConnected(true);
-                                void load();
-                            }}
-                            size='sm'
-                        />
-                    </div>
-                :   <div className='space-y-2'>
-                        <p className='text-xs text-muted-foreground'>
-                            {preferReconnect ?
-                                "La cuenta quedó desvinculada. Podés vincular otra cuenta de Mercado Pago."
-                            :   "Sin cuenta vinculada. Conectá Mercado Pago para cobrar con QR."}
-                        </p>
-                        <MercadoPagoVinculacionCtas
-                            negocioId={negocioId}
-                            connected={false}
-                            oauthReturnPath={oauthReturnPath}
-                            preferReconnectCopy={preferReconnect}
                             onConnect={startConnect}
                             onUnlinked={() => void load()}
                             size='sm'
                         />
                     </div>
+                :   <MercadoPagoVinculacionCtas
+                        negocioId={negocioId}
+                        connected={false}
+                        onConnect={startConnect}
+                        onUnlinked={() => void load()}
+                        size='sm'
+                    />
                 }
                 {configuracionHref ?
                     <p className='text-xs'>
@@ -167,49 +149,27 @@ export function MercadoPagoOAuthStatusBanner({
                         <Button type='button' size='sm' variant='outline' onClick={() => void load()}>
                             Reintentar
                         </Button>
-                        <Button type='button' size='sm' onClick={() => startConnect({ reconnect: true })}>
-                            Reconectar
+                        <Button type='button' size='sm' onClick={startConnect}>
+                            Vincular
                         </Button>
                     </div>
                 </div>
             : connected ?
                 <div className='space-y-3'>
-                    <p className='text-sm text-muted-foreground'>Ya podés cobrar con QR en esta pestaña.</p>
-                    <p className='text-sm text-muted-foreground'>{MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT}</p>
                     <MercadoPagoCuentaDetalles status={status!} />
                     <MercadoPagoVinculacionCtas
                         negocioId={negocioId}
                         connected
-                        oauthReturnPath={oauthReturnPath}
-                        onConnect={startConnect}
-                        onUnlinked={() => {
-                            setWasConnected(true);
-                            void load();
-                        }}
-                    />
-                </div>
-            :   <div className='space-y-3'>
-                    <p className='text-sm text-muted-foreground'>
-                        {preferReconnect ?
-                            "La cuenta quedó desvinculada. Vinculá otra cuenta para seguir cobrando con QR."
-                        :   "Todavía no conectaste Mercado Pago. El proceso tarda un minuto: iniciás sesión en MP y volvés acá."}
-                    </p>
-                    {!preferReconnect ?
-                        <ol className='list-decimal list-inside space-y-1 text-sm text-muted-foreground pl-0.5'>
-                            <li>Tocá «Conectar con Mercado Pago».</li>
-                            <li>Iniciá sesión con la cuenta del comercio.</li>
-                            <li>Aceptá los permisos y volvé a Cobrar.</li>
-                        </ol>
-                    :   null}
-                    <MercadoPagoVinculacionCtas
-                        negocioId={negocioId}
-                        connected={false}
-                        oauthReturnPath={oauthReturnPath}
-                        preferReconnectCopy={preferReconnect}
                         onConnect={startConnect}
                         onUnlinked={() => void load()}
                     />
                 </div>
+            :   <MercadoPagoVinculacionCtas
+                    negocioId={negocioId}
+                    connected={false}
+                    onConnect={startConnect}
+                    onUnlinked={() => void load()}
+                />
             }
         </section>
     );

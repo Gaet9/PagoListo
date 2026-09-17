@@ -14,7 +14,7 @@ export type MpOAuthErrorCode =
 
 const ERROR_MESSAGES: Record<MpOAuthErrorCode, string> = {
     cancelado: "No autorizaste la conexión en Mercado Pago. Podés intentarlo de nuevo cuando quieras.",
-    estado_invalido: "La vinculación expiró o el enlace no es válido. Volvé a Configuración y tocá «Conectar con Mercado Pago».",
+    estado_invalido: "La vinculación expiró o el enlace no es válido. Volvé a Configuración y tocá «Vincular».",
     estado_expirado: "Pasó demasiado tiempo antes de autorizar. Volvé a Configuración e iniciá la conexión otra vez.",
     intercambio_fallido:
         "Mercado Pago no pudo completar la vinculación. Revisá que tu cuenta MP esté activa e intentá de nuevo en unos minutos.",
@@ -28,7 +28,7 @@ export function isMpOAuthErrorCode(value: string): value is MpOAuthErrorCode {
 
 export function mpOAuthErrorMessage(code: string | null | undefined): string {
     if (code && isMpOAuthErrorCode(code)) return ERROR_MESSAGES[code];
-    return "No se pudo vincular Mercado Pago. Volvé a Configuración e intentá conectar de nuevo.";
+    return "No se pudo vincular Mercado Pago. Volvé a Configuración e intentá de nuevo.";
 }
 
 export type MpOAuthFlash =

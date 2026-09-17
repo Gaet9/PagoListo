@@ -460,11 +460,7 @@ export function CobrarTab({ negocioId }: Props) {
                         type='button'
                         variant={paymentMethod === "qr" ? "default" : "outline"}
                         disabled={mpConnectedForQr !== true}
-                        title={
-                            mpConnectedForQr === false ?
-                                "Conectá Mercado Pago arriba para cobrar con QR"
-                            :   undefined
-                        }
+                        title={mpConnectedForQr === false ? "Vinculá Mercado Pago arriba" : undefined}
                         onClick={() => setPaymentMethod("qr")}>
                         Mercado Pago (QR)
                     </Button>
@@ -475,12 +471,6 @@ export function CobrarTab({ negocioId }: Props) {
                         Transferencia
                     </Button>
                 </div>
-
-                {mpConnectedForQr === false ?
-                    <p className='text-xs text-muted-foreground'>
-                        Mercado Pago está desvinculada. Usá «Conectar con Mercado Pago» en el recuadro de arriba para habilitar el QR.
-                    </p>
-                :   null}
 
                 {paymentMethod === "cash" ?
                     <div className='pt-2 flex justify-end'>
@@ -504,10 +494,7 @@ export function CobrarTab({ negocioId }: Props) {
                                 Preparando QR…
                             </div>
                         : qrConnected === false ?
-                            <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center'>
-                                <p className='text-sm text-muted-foreground min-w-0 flex-1'>
-                                    Conectá la cuenta de Mercado Pago de esta tienda (un clic, volvés a Cobrar al terminar).
-                                </p>
+                            <div className='flex justify-end'>
                                 <Button
                                     type='button'
                                     className='shrink-0'
@@ -517,7 +504,7 @@ export function CobrarTab({ negocioId }: Props) {
                                         const redirectTo = `${window.location.pathname}?${params.toString()}`;
                                         window.location.href = buildMercadoPagoOAuthStartPath(negocioId, redirectTo);
                                     }}>
-                                    Conectar con Mercado Pago
+                                    Vincular
                                 </Button>
                             </div>
                         : qrInitPoint ?

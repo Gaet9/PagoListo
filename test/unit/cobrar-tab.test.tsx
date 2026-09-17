@@ -202,7 +202,6 @@ describe("CobrarTab", () => {
 
         await waitFor(() => {
             expect(screen.getByRole("button", { name: "Mercado Pago (QR)" })).toBeDisabled();
-            expect(screen.getByText(/Mercado Pago está desvinculada/i)).toBeInTheDocument();
         });
     });
 });

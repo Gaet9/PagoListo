@@ -10,7 +10,6 @@ import { PageShell } from "@/components/ui/page-shell";
 import { Spinner } from "@/components/ui/spinner";
 import { fetchMercadoPagoOAuthStatus } from "@/lib/mercadopago/fetch-oauth-status-client";
 import { buildMercadoPagoOAuthStartPath, resolveMercadoPagoOAuthReturnPath } from "@/lib/mercadopago/oauth-start-url";
-import { MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT } from "@/lib/mercadopago/mp-connect-another-copy";
 import { parseMpOAuthFlashFromSearchParams } from "@/lib/mercadopago/oauth-return";
 import type { MercadoPagoOAuthStatusResponse } from "@/lib/types/mercadopago-oauth-status";
 
@@ -20,7 +19,6 @@ export function ConfiguracionTab({ negocioId }: Props) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<MercadoPagoOAuthStatusResponse | null>(null);
-    const [wasConnected, setWasConnected] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -33,7 +31,6 @@ export function ConfiguracionTab({ negocioId }: Props) {
             return;
         }
         setStatus(result.status);
-        if (result.status.connected) setWasConnected(true);
     }, [negocioId]);
 
     useEffect(() => {
@@ -46,16 +43,14 @@ export function ConfiguracionTab({ negocioId }: Props) {
         if (flash?.kind === "ok") void load();
     }, [load]);
 
-    const startOAuth = (options?: { reconnect?: boolean }) => {
+    const startOAuth = () => {
         window.location.href = buildMercadoPagoOAuthStartPath(
             negocioId,
             resolveMercadoPagoOAuthReturnPath(),
-            options,
         );
     };
 
     const connected = !!status?.connected;
-    const preferReconnect = wasConnected && !connected;
 
     return (
         <div className='flex flex-col gap-6'>
@@ -69,10 +64,6 @@ export function ConfiguracionTab({ negocioId }: Props) {
                     <h3 className='text-sm font-medium'>Mercado Pago</h3>
                     {!loading && !error ? <MercadoPagoEstadoBadge connected={connected} /> : null}
                 </div>
-                <p className='mt-2 text-sm text-muted-foreground'>
-                    Vinculá la cuenta de Mercado Pago de esta tienda para cobrar con QR en el mostrador. Solo hace falta iniciar sesión en
-                    MP y aceptar los permisos.
-                </p>
 
                 {error ?
                     <div className='mt-3 space-y-2'>
@@ -81,8 +72,8 @@ export function ConfiguracionTab({ negocioId }: Props) {
                             <Button type='button' size='sm' variant='outline' onClick={() => void load()}>
                                 Reintentar
                             </Button>
-                            <Button type='button' size='sm' onClick={() => startOAuth({ reconnect: true })}>
-                                Reconectar
+                            <Button type='button' size='sm' onClick={startOAuth}>
+                                Vincular
                             </Button>
                         </div>
                     </div>
@@ -95,38 +86,17 @@ export function ConfiguracionTab({ negocioId }: Props) {
                     </div>
                 : connected ?
                     <div className='mt-4 space-y-3'>
-                        <p className='text-sm text-muted-foreground'>Cuenta lista para cobrar con QR en la pestaña Cobrar.</p>
-                        <p className='text-sm text-muted-foreground'>{MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT}</p>
                         <MercadoPagoCuentaDetalles status={status!} />
                     </div>
-                :   <div className='mt-4 space-y-2 text-sm text-muted-foreground'>
-                        <p>
-                            {preferReconnect ?
-                                "La cuenta quedó desvinculada. Podés vincular otra cuenta de Mercado Pago."
-                            :   "Todavía no hay una cuenta de Mercado Pago conectada a esta tienda."}
-                        </p>
-                        {!preferReconnect ?
-                            <ol className='list-decimal list-inside space-y-1 pl-0.5'>
-                                <li>Tocá «Conectar con Mercado Pago».</li>
-                                <li>Iniciá sesión con la cuenta del comercio.</li>
-                                <li>Aceptá los permisos y volvé acá automáticamente.</li>
-                            </ol>
-                        :   null}
-                    </div>
-                }
+                :   null}
 
                 {!loading && !error ?
                     <div className='mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end'>
                         <MercadoPagoVinculacionCtas
                             negocioId={negocioId}
                             connected={connected}
-                            oauthReturnPath={resolveMercadoPagoOAuthReturnPath()}
-                            preferReconnectCopy={preferReconnect}
                             onConnect={startOAuth}
-                            onUnlinked={() => {
-                                setWasConnected(true);
-                                void load();
-                            }}
+                            onUnlinked={() => void load()}
                         />
                     </div>
                 :   null}
