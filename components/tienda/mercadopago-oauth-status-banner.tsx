@@ -8,6 +8,7 @@ import { MercadoPagoVinculacionCtas } from "@/components/tienda/mercadopago-vinc
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { fetchMercadoPagoOAuthStatus } from "@/lib/mercadopago/fetch-oauth-status-client";
+import { MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT } from "@/lib/mercadopago/mp-connect-another-copy";
 import { buildMercadoPagoOAuthStartPath } from "@/lib/mercadopago/oauth-start-url";
 import { parseMpOAuthFlashFromSearchParams } from "@/lib/mercadopago/oauth-return";
 import type { MercadoPagoOAuthStatusResponse } from "@/lib/types/mercadopago-oauth-status";
@@ -96,10 +97,12 @@ export function MercadoPagoOAuthStatusBanner({
                     </div>
                 : connected ?
                     <div className='space-y-2'>
+                        <p className='text-xs text-muted-foreground'>{MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT}</p>
                         <MercadoPagoCuentaDetalles status={status!} size='sm' />
                         <MercadoPagoVinculacionCtas
                             negocioId={negocioId}
                             connected
+                            oauthReturnPath={oauthReturnPath}
                             onConnect={startConnect}
                             onUnlinked={() => {
                                 setWasConnected(true);
@@ -171,10 +174,12 @@ export function MercadoPagoOAuthStatusBanner({
             : connected ?
                 <div className='space-y-3'>
                     <p className='text-sm text-muted-foreground'>Ya podés cobrar con QR en esta pestaña.</p>
+                    <p className='text-sm text-muted-foreground'>{MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT}</p>
                     <MercadoPagoCuentaDetalles status={status!} />
                     <MercadoPagoVinculacionCtas
                         negocioId={negocioId}
                         connected
+                        oauthReturnPath={oauthReturnPath}
                         onConnect={startConnect}
                         onUnlinked={() => {
                             setWasConnected(true);

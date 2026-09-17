@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-shell";
 import { Spinner } from "@/components/ui/spinner";
 import { fetchMercadoPagoOAuthStatus } from "@/lib/mercadopago/fetch-oauth-status-client";
-import { buildMercadoPagoOAuthStartPath } from "@/lib/mercadopago/oauth-start-url";
+import { buildMercadoPagoOAuthStartPath, resolveMercadoPagoOAuthReturnPath } from "@/lib/mercadopago/oauth-start-url";
+import { MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT } from "@/lib/mercadopago/mp-connect-another-copy";
 import { parseMpOAuthFlashFromSearchParams } from "@/lib/mercadopago/oauth-return";
 import type { MercadoPagoOAuthStatusResponse } from "@/lib/types/mercadopago-oauth-status";
 
@@ -46,7 +47,7 @@ export function ConfiguracionTab({ negocioId }: Props) {
     }, [load]);
 
     const startOAuth = () => {
-        window.location.href = buildMercadoPagoOAuthStartPath(negocioId);
+        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, resolveMercadoPagoOAuthReturnPath());
     };
 
     const connected = !!status?.connected;
@@ -91,6 +92,7 @@ export function ConfiguracionTab({ negocioId }: Props) {
                 : connected ?
                     <div className='mt-4 space-y-3'>
                         <p className='text-sm text-muted-foreground'>Cuenta lista para cobrar con QR en la pestaña Cobrar.</p>
+                        <p className='text-sm text-muted-foreground'>{MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT}</p>
                         <MercadoPagoCuentaDetalles status={status!} />
                     </div>
                 :   <div className='mt-4 space-y-2 text-sm text-muted-foreground'>
