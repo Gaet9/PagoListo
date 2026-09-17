@@ -19,6 +19,21 @@ Errores típicos si se mezclan:
 
 `MERCADOPAGO_OAUTH_CLIENT_ID` debe ser el **número de aplicación** (App ID) de la app OAuth/cobro, visible en *Detalles de la aplicación* — no el prefijo `APP_USR-` del access token.
 
+### Nombres de variables que lee el código (Vercel)
+
+PagoListo **no** usa `MERCADOPAGO_PUBLIC_KEY`, `MERCADOPAGO_ACCESS_TOKEN`, ni variantes sin sufijo `_SAAS` / `MERCADOPAGO_OAUTH_*`. Si existen en Vercel, son **huérfanas** y no afectan OAuth; el abono SaaS solo lee `MERCADOPAGO_ACCESS_TOKEN_SAAS` y `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY_SAAS`.
+
+| Variable | Formato en producción (cobro / OAuth tienda) | Formato sandbox (solo QA) |
+| --- | --- | --- |
+| `MERCADOPAGO_OAUTH_CLIENT_ID` | Número **App ID** de la app MP **producción** de cobro (misma app donde está el Redirect URI www) | App ID de la app de **prueba** (otro número; otro Redirect URI en panel) |
+| `MERCADOPAGO_OAUTH_CLIENT_SECRET` | **Client Secret** de esa misma app producción (no es `APP_USR-…`) | Secret de la app de prueba |
+| `MERCADOPAGO_ACCESS_TOKEN_SAAS` | `APP_USR-…` **producción** (sin prefijo `TEST-`) | `TEST-…` |
+| `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY_SAAS` | Public key **producción** (sin `TEST-`) | `TEST-…` |
+
+**Modo test vs producción en OAuth:** el authorize siempre va a `https://auth.mercadopago.com` con `redirect_uri` de producción. Si `MERCADOPAGO_OAUTH_CLIENT_ID` / `SECRET` pertenecen a una **aplicación de prueba** (la misma familia que credenciales `TEST-` en SaaS), Mercado Pago suele responder *«la aplicación no puede conectarse a tu cuenta»* **sin login**. Gaétan debe comparar en Developers el **Application ID** de la app de cobro **producción** con el valor de `MERCADOPAGO_OAUTH_CLIENT_ID` en Vercel (deben coincidir).
+
+Tras un intento de vincular, revisar logs de `/api/mercadopago/oauth/start`: avisos `[mp-oauth]` por client_id tipo token, `TEST-` en SaaS, o redirect desalineado.
+
 ## Cómo arma PagoListo la URL de authorize
 
 El servidor redirige a MP desde `GET /api/mercadopago/oauth/start` (tras sesión Supabase y guardar state + PKCE en `mp_oauth_states`).

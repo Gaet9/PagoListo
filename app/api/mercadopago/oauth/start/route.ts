@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getMercadoPagoOAuthStartConfigWarnings } from "@/lib/mercadopago/oauth-credential-hints";
 import { getMercadoPagoOAuthRedirectUriMismatchWarning } from "@/lib/mercadopago/oauth-redirect-uri";
 import { buildMercadoPagoAuthorizeUrl, newOAuthState, newPkceCodeVerifier, pkceChallengeS256 } from "@/lib/mercadopago/oauth";
 import { areEquivalentSiteOrigins, getConfiguredSiteOrigin } from "@/lib/mercadopago/oauth-site-host";
@@ -86,6 +87,9 @@ export async function GET(request: NextRequest) {
   const redirectMismatch = getMercadoPagoOAuthRedirectUriMismatchWarning();
   if (redirectMismatch) {
     console.error(redirectMismatch);
+  }
+  for (const warning of getMercadoPagoOAuthStartConfigWarnings()) {
+    console.error(warning);
   }
 
   const authUrl = buildMercadoPagoAuthorizeUrl({ state, codeChallenge });
