@@ -12,10 +12,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Cuerpo JSON inválido" }, { status: 400 });
   }
 
-  const negocioId =
-    json && typeof json === "object" && "negocioId" in json && typeof (json as { negocioId: unknown }).negocioId === "string"
-      ? (json as { negocioId: string }).negocioId.trim()
-      : "";
+  const body = json && typeof json === "object" ? (json as Record<string, unknown>) : null;
+  const negocioId = body && typeof body.negocioId === "string" ? body.negocioId.trim() : "";
+  const strictRevoke = body?.strictRevoke === true;
   if (!negocioId) {
     return NextResponse.json({ error: "Falta negocioId" }, { status: 400 });
   }
@@ -34,7 +33,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Negocio no encontrado o sin permisos" }, { status: 404 });
   }
 
-  const result = await disconnectNegocioMercadoPagoOAuth(negocioId);
+  const result = await disconnectNegocioMercadoPagoOAuth(negocioId, {
+    failClosedWhenStoredTokensExist: strictRevoke,
+  });
   if (!result.ok) {
     return NextResponse.json({ error: "No se pudo desvincular Mercado Pago. Reintentá en unos minutos." }, { status: 500 });
   }

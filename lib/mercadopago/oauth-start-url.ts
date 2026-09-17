@@ -19,7 +19,8 @@ export function resolveMercadoPagoOAuthReturnPath(fallback = "/tiendas?tab=confi
 /**
  * Path del servidor que inicia OAuth (PKCE + state). Usar en el cliente con `window.location.href`.
  *
- * Otra cuenta MP: `…&reconnect=1` (el servidor desvincula + `prompt=login` en authorize).
+ * Otra cuenta MP (UI): `POST /api/mercadopago/oauth/unlink` con `strictRevoke: true`, luego start **sin** `reconnect`.
+ * `reconnect=1` queda solo para compat / herramientas: desvincula en servidor + `prompt=login` (best-effort).
  */
 export function buildMercadoPagoOAuthStartPath(
     negocioId: string,

@@ -6,7 +6,6 @@ import { MercadoPagoDesvincularDialog } from "@/components/tienda/mercadopago-de
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { beginMercadoPagoConnectAnotherAccount } from "@/lib/mercadopago/oauth-reconnect-client";
-import { resolveMercadoPagoOAuthReturnPath } from "@/lib/mercadopago/oauth-start-url";
 
 type Props = {
     negocioId: string;
@@ -23,8 +22,6 @@ type Props = {
 export function MercadoPagoVinculacionCtas({
     negocioId,
     connected,
-    oauthReturnPath,
-    preferReconnectCopy,
     onConnect,
     onUnlinked,
     size = "default",
@@ -37,36 +34,25 @@ export function MercadoPagoVinculacionCtas({
         if (connectingAnother) return;
         setConnectAnotherError(null);
         setConnectingAnother(true);
-        const redirectTo = oauthReturnPath?.trim() || resolveMercadoPagoOAuthReturnPath();
-        void beginMercadoPagoConnectAnotherAccount(negocioId, redirectTo).then((result) => {
+        void beginMercadoPagoConnectAnotherAccount(negocioId).then((result) => {
             if (!result.ok) {
                 setConnectingAnother(false);
                 setConnectAnotherError(result.message);
+                return;
             }
+            setConnectingAnother(false);
+            onUnlinked();
         });
     };
 
     if (!connected) {
-        const label =
-            preferReconnectCopy ? "Vincular otra cuenta"
-            : "Conectar con Mercado Pago";
-        const useReconnectFlow = !!preferReconnectCopy;
         return (
             <div className='flex flex-col items-stretch gap-2 sm:items-end'>
                 {connectAnotherError ?
                     <p className='text-sm text-destructive' role='alert'>{connectAnotherError}</p>
                 :   null}
-                <Button
-                    type='button'
-                    size={btnSize}
-                    disabled={connectingAnother && useReconnectFlow}
-                    onClick={useReconnectFlow ? startConnectAnother : onConnect}>
-                    {connectingAnother && useReconnectFlow ?
-                        <>
-                            <Spinner className='size-4 shrink-0' aria-hidden />
-                            <span>Desvinculando…</span>
-                        </>
-                    :   label}
+                <Button type='button' size={btnSize} onClick={onConnect}>
+                    Conectar con Mercado Pago
                 </Button>
             </div>
         );

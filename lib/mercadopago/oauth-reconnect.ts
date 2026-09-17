@@ -1,7 +1,7 @@
 /**
- * `GET /api/mercadopago/oauth/start?reconnect=1` — otra cuenta MP / re-login.
- * Servidor: disconnect fail-closed (revoke MP obligatorio si había tokens) + authorize con `prompt=login` (best-effort).
- * MP no documenta logout de navegador ni `prompt`; ver `oauth-mp-browser-session.ts`.
+ * `GET /api/mercadopago/oauth/start?reconnect=1` — legado / ops (no usar desde «Vincular otra cuenta» en UI).
+ * Servidor: disconnect fail-closed + authorize con `prompt=login` (best-effort; MP suele ignorarlo).
+ * Flujo producto (Fran): unlink (`strictRevoke`) → UI desvinculada → start sin `reconnect`. Ver `oauth-reconnect-client.ts`.
  */
 
 export const MERCADOPAGO_OAUTH_RECONNECT_QUERY_PARAM = "reconnect";

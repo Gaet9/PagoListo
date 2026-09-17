@@ -91,7 +91,7 @@ export function MercadoPagoOAuthStatusBanner({
                         <Button type='button' size='sm' variant='outline' className='h-8' onClick={() => void load()}>
                             Reintentar
                         </Button>
-                        <Button type='button' size='sm' className='h-8' onClick={() => startConnect({ reconnect: true })}>
+                        <Button type='button' size='sm' className='h-8' onClick={() => startConnect()}>
                             Reconectar
                         </Button>
                     </div>
@@ -167,7 +167,7 @@ export function MercadoPagoOAuthStatusBanner({
                         <Button type='button' size='sm' variant='outline' onClick={() => void load()}>
                             Reintentar
                         </Button>
-                        <Button type='button' size='sm' onClick={() => startConnect({ reconnect: true })}>
+                        <Button type='button' size='sm' onClick={() => startConnect()}>
                             Reconectar
                         </Button>
                     </div>

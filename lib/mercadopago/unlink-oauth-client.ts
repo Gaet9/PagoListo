@@ -2,12 +2,25 @@ import { MERCADOPAGO_OAUTH_UNLINK_API_PATH } from "@/lib/mercadopago/oauth-unlin
 
 export type UnlinkMercadoPagoOAuthResult = { ok: true } | { ok: false; message: string; notImplemented?: boolean };
 
-export async function unlinkMercadoPagoOAuth(negocioId: string): Promise<UnlinkMercadoPagoOAuthResult> {
+export type UnlinkMercadoPagoOAuthOptions = {
+    /**
+     * «Vincular otra cuenta»: si había token guardado, exige revocación MP antes de borrar en Supabase.
+     */
+    strictRevoke?: boolean;
+};
+
+export async function unlinkMercadoPagoOAuth(
+    negocioId: string,
+    options?: UnlinkMercadoPagoOAuthOptions,
+): Promise<UnlinkMercadoPagoOAuthResult> {
     const res = await fetch(MERCADOPAGO_OAUTH_UNLINK_API_PATH, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ negocioId }),
+        body: JSON.stringify({
+            negocioId,
+            ...(options?.strictRevoke ? { strictRevoke: true } : {}),
+        }),
     });
     const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
     if (res.status === 404 || res.status === 501 || data.code === "not_implemented") {
