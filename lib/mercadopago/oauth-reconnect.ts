@@ -1,7 +1,7 @@
 /**
- * `GET /api/mercadopago/oauth/start?reconnect=1` — otra cuenta MP / re-login.
- * Servidor: disconnect fail-closed (revoke MP obligatorio si había tokens) + authorize con `prompt=login` (best-effort).
- * MP no documenta logout de navegador ni `prompt`; ver `oauth-mp-browser-session.ts`.
+ * Query `reconnect=1` en `GET /api/mercadopago/oauth/start` (#29 / #33).
+ * Servidor: disconnect fail-closed + authorize con `prompt=login` (best-effort).
+ * Producto (#35): otra cuenta MP = Desvincular → Vincular **sin** este flag; ver docs/mercadopago-oauth-ops.md.
  */
 
 export const MERCADOPAGO_OAUTH_RECONNECT_QUERY_PARAM = "reconnect";
