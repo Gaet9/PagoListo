@@ -5,6 +5,10 @@ import { getMercadoPagoOAuthRedirectUriMismatchWarning } from "@/lib/mercadopago
 import { disconnectNegocioMercadoPagoOAuth } from "@/lib/mercadopago/disconnect-negocio-oauth";
 import { resolveMercadoPagoOAuthReconnectBrowserRedirect } from "@/lib/mercadopago/oauth-mp-browser-session";
 import { buildMercadoPagoAuthorizeUrl, newOAuthState, newPkceCodeVerifier, pkceChallengeS256 } from "@/lib/mercadopago/oauth";
+import {
+  buildMercadoPagoOAuthStartReconnectDebug,
+  mercadoPagoOAuthStartReconnectDebugHeaders,
+} from "@/lib/mercadopago/oauth-start-debug";
 import { isMercadoPagoOAuthReconnectRequested } from "@/lib/mercadopago/oauth-reconnect";
 import { areEquivalentSiteOrigins, getConfiguredSiteOrigin } from "@/lib/mercadopago/oauth-site-host";
 import { createClient } from "@/lib/supabase/server";
@@ -113,6 +117,14 @@ export async function GET(request: NextRequest) {
     reconnect,
   });
   const browserRedirect = reconnect ? resolveMercadoPagoOAuthReconnectBrowserRedirect(authUrl) : authUrl;
-  return NextResponse.redirect(browserRedirect);
+  const response = NextResponse.redirect(browserRedirect);
+  if (reconnect) {
+    const debug = buildMercadoPagoOAuthStartReconnectDebug(authUrl);
+    console.info("[mp-oauth/start] reconnect authorize", debug);
+    for (const [name, value] of Object.entries(mercadoPagoOAuthStartReconnectDebugHeaders())) {
+      response.headers.set(name, value);
+    }
+  }
+  return response;
 }
 

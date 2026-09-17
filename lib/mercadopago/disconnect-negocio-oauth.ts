@@ -11,6 +11,10 @@ export type DisconnectNegocioMercadoPagoOptions = {
    * antes de borrar filas locales. Si falla, no se borra la vinculación (fail closed).
    */
   failClosedWhenStoredTokensExist?: boolean;
+  /**
+   * `POST /api/mercadopago/oauth/unlink` (2-tap Desvincular): mismo fail-closed que reconnect start.
+   */
+  strictRevoke?: boolean;
 };
 
 export type DisconnectNegocioMercadoPagoResult =
@@ -22,7 +26,8 @@ export async function disconnectNegocioMercadoPagoOAuth(
   negocioId: string,
   options?: DisconnectNegocioMercadoPagoOptions,
 ): Promise<DisconnectNegocioMercadoPagoResult> {
-  const failClosed = options?.failClosedWhenStoredTokensExist === true;
+  const failClosed =
+    options?.strictRevoke === true || options?.failClosedWhenStoredTokensExist === true;
   const admin = createAdminClient();
 
   const { data: row, error: readErr } = await admin
