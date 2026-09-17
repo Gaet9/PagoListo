@@ -3,9 +3,9 @@ import "server-only";
 import { MercadoPagoConfig } from "mercadopago";
 
 /**
- * Access token privé de l’application Mercado Pago « SaaS / Checkout Pro »
- * (OAuth vendeurs, préférences, paiements). Réservé au serveur.
- * L’abonnement plateforme utilisera une seconde app MP (autres variables, plus tard).
+ * Access token de la app Mercado Pago « SaaS / abono » (Checkout Pro plataforma).
+ * Distinto del OAuth por negocio (`MERCADOPAGO_OAUTH_CLIENT_ID` / tokens en `negocio_mercadopago_oauth`).
+ * Solo servidor.
  */
 export function getMercadoPagoSaasAccessToken(): string {
   const token = process.env.MERCADOPAGO_ACCESS_TOKEN_SAAS?.trim();
