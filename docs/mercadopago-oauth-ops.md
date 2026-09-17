@@ -50,7 +50,9 @@ Parámetros (ver `lib/mercadopago/oauth.ts` → `buildMercadoPagoAuthorizeUrl`):
 | `state` | aleatorio (un solo uso, ~10 min) |
 | `scope` | `offline_access payments write` |
 | `code_challenge` / `code_challenge_method` | PKCE **S256** (siempre enviados) |
-| `prompt` | Solo si start trae `reconnect=1`: `login` — **no documentado por MP** (best-effort) |
+| `prompt` | Solo si start trae `reconnect=1`: `login` — **no figura** en la [documentación de authorize](https://www.mercadopago.com.ar/developers/en/docs/security/oauth/creation) (best-effort) |
+
+**Auditoría repo:** no hay URLs de logout MP/MELI en el código; ver `lib/mercadopago/oauth-mp-browser-session.ts`.
 
 ### `reconnect=1` en oauth/start (otra cuenta MP)
 

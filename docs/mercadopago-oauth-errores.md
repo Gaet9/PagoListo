@@ -46,4 +46,10 @@ Constante compartida con el cliente UI: `MERCADOPAGO_OAUTH_UNLINK_API_PATH` en `
 
 Respuesta segura (sin tokens): `{ "ok": true }` con HTTP 200 (también si ya estaba desvinculado).
 
-Re-vincular / otra cuenta: `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…&reconnect=1` (servidor desvincula + `prompt=login` best-effort). Primer vínculo: sin `reconnect`.
+Re-vincular / otra cuenta: `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…&reconnect=1`.
+
+- **Servidor (obligatorio):** `disconnectNegocioMercadoPagoOAuth` con fail-closed — si había `access_token`, la revocación en MP debe OK **antes** del borrado en Supabase; si falla revoke o delete → HTTP 500 y **no** hay redirect a authorize.
+- **Authorize:** se envía `prompt=login` (best-effort; MP no lo documenta en el flujo de creación).
+- **Navegador:** MP no publica URL de logout para integradores; ver limitación en [`mercadopago-oauth-ops.md`](./mercadopago-oauth-ops.md) y copy `MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT`.
+
+Primer vínculo: mismo endpoint **sin** `reconnect`.

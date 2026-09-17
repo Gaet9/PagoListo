@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (reconnect) {
+    // Revoke MP + delete Supabase must finish before PKCE/state and authorize redirect.
     const disconnect = await disconnectNegocioMercadoPagoOAuth(negocioId, {
       failClosedWhenStoredTokensExist: true,
     });

@@ -1,11 +1,14 @@
 /**
  * Sesión del navegador en Mercado Pago / Mercado Libre durante OAuth.
  *
- * La documentación oficial de OAuth ([Manage Access Token](https://www.mercadopago.com.ar/developers/en/docs/security/oauth/management))
- * describe revocación vía API y eventos de cuenta, pero **no** publica una URL de logout de terceros
- * en `auth.mercadopago.com` ni un parámetro `prompt=login` en el authorize.
+ * Documentación MP:
+ * - [Manage Access Token](https://www.mercadopago.com.ar/developers/en/docs/security/oauth/management) — revocación de autorización (tokens borrados en MP); **sin** URL de logout de vendedor para integradores.
+ * - [Get Access Token / authorize](https://www.mercadopago.com.ar/developers/en/docs/security/oauth/creation) — parámetros de authorize documentados **sin** `prompt=login`.
  *
- * PagoListo no usa URLs de logout no documentadas (evita hacks cross-origin / cookies).
+ * Auditoría del repo: no hay uso de URLs de logout MP/MELI. Lo único en `auth.mercadopago.com` es
+ * `/authorization` (`lib/mercadopago/oauth.ts`). `components/logout-button.tsx` cierra sesión de **PagoListo** (Supabase), no de Mercado Pago.
+ *
+ * PagoListo no inventa hops de logout ni hacks cross-origin de cookies.
  */
 
 /** URL de logout MP/MELI documentada para integradores OAuth — hoy ninguna. */
