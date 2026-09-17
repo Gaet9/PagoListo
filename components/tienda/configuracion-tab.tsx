@@ -81,7 +81,7 @@ export function ConfiguracionTab({ negocioId }: Props) {
                             <Button type='button' size='sm' variant='outline' onClick={() => void load()}>
                                 Reintentar
                             </Button>
-                            <Button type='button' size='sm' onClick={() => startOAuth({ reconnect: true })}>
+                            <Button type='button' size='sm' onClick={() => startOAuth()}>
                                 Reconectar
                             </Button>
                         </div>

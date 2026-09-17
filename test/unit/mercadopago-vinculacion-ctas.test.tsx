@@ -17,7 +17,8 @@ describe("MercadoPagoVinculacionCtas", () => {
         vi.unstubAllGlobals();
     });
 
-    it("Vincular otra cuenta desvincula primero y navega a start con reconnect=1", async () => {
+    it("Vincular otra cuenta desvincula y llama onUnlinked sin ir a oauth/start", async () => {
+        const onUnlinked = vi.fn();
         globalThis.fetch = vi.fn(async (input): Promise<Response> => {
             const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
             if (url.includes(MERCADOPAGO_OAUTH_UNLINK_API_PATH)) {
@@ -32,16 +33,16 @@ describe("MercadoPagoVinculacionCtas", () => {
                 connected
                 oauthReturnPath='/perfil'
                 onConnect={() => {}}
-                onUnlinked={() => {}}
+                onUnlinked={onUnlinked}
             />,
         );
 
         fireEvent.click(screen.getByRole("button", { name: /Vincular otra cuenta/i }));
 
         await waitFor(() => {
-            expect(window.location.href).toContain("reconnect=1");
+            expect(onUnlinked).toHaveBeenCalled();
         });
-        expect(window.location.href).not.toContain("forceAccountSelect");
+        expect(window.location.href).toBe("");
         expect(globalThis.fetch).toHaveBeenCalled();
     });
 

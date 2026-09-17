@@ -46,10 +46,15 @@ Constante compartida con el cliente UI: `MERCADOPAGO_OAUTH_UNLINK_API_PATH` en `
 
 Respuesta segura (sin tokens): `{ "ok": true }` con HTTP 200 (también si ya estaba desvinculado).
 
-Re-vincular / otra cuenta: `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…&reconnect=1`.
+**Otra cuenta MP (UI, dos pasos — Fran):**
 
-- **Servidor (obligatorio):** `disconnectNegocioMercadoPagoOAuth` con fail-closed — si había `access_token`, la revocación en MP debe OK **antes** del borrado en Supabase; si falla revoke o delete → HTTP 500 y **no** hay redirect a authorize.
-- **Authorize:** se envía `prompt=login` (best-effort; MP no lo documenta en el flujo de creación).
-- **Navegador:** MP no publica URL de logout para integradores; ver limitación en [`mercadopago-oauth-ops.md`](./mercadopago-oauth-ops.md) y copy `MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT`.
+1. `POST /api/mercadopago/oauth/unlink` con `{ "negocioId": "<uuid>", "strictRevoke": true }` — fail-closed si había `access_token` (revoke MP antes de borrar Supabase).
+2. UI en estado **Desvinculada**; el usuario toca «Conectar con Mercado Pago» → `GET /api/mercadopago/oauth/start?negocioId=…&redirectTo=…` **sin** `reconnect`.
 
-Primer vínculo: mismo endpoint **sin** `reconnect`.
+Helper cliente: `beginMercadoPagoConnectAnotherAccount(negocioId)` en `lib/mercadopago/oauth-reconnect-client.ts`.
+
+**Legado / ops:** `reconnect=1` en oauth/start sigue desvinculando en servidor y agrega `prompt=login` (best-effort; MP suele ignorarlo). No usar desde «Vincular otra cuenta» en la app.
+
+**Navegador:** MP no publica URL de logout para integradores; ver [`mercadopago-oauth-ops.md`](./mercadopago-oauth-ops.md) y `MERCADOPAGO_CONNECT_ANOTHER_ACCOUNT_HINT`.
+
+Primer vínculo: oauth/start **sin** `reconnect`.

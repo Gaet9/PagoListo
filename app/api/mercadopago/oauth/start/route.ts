@@ -3,6 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getMercadoPagoOAuthStartConfigWarnings } from "@/lib/mercadopago/oauth-credential-hints";
 import { getMercadoPagoOAuthRedirectUriMismatchWarning } from "@/lib/mercadopago/oauth-redirect-uri";
 import { disconnectNegocioMercadoPagoOAuth } from "@/lib/mercadopago/disconnect-negocio-oauth";
+import {
+  getMercadoPagoOAuthAuthorizeRedirectDebug,
+  mercadoPagoOAuthAuthorizeDebugHeaders,
+} from "@/lib/mercadopago/oauth-authorize-debug";
 import { resolveMercadoPagoOAuthReconnectBrowserRedirect } from "@/lib/mercadopago/oauth-mp-browser-session";
 import { buildMercadoPagoAuthorizeUrl, newOAuthState, newPkceCodeVerifier, pkceChallengeS256 } from "@/lib/mercadopago/oauth";
 import { isMercadoPagoOAuthReconnectRequested } from "@/lib/mercadopago/oauth-reconnect";
@@ -113,6 +117,9 @@ export async function GET(request: NextRequest) {
     reconnect,
   });
   const browserRedirect = reconnect ? resolveMercadoPagoOAuthReconnectBrowserRedirect(authUrl) : authUrl;
-  return NextResponse.redirect(browserRedirect);
+  const authorizeDebug = getMercadoPagoOAuthAuthorizeRedirectDebug({ reconnect, authorizeUrl: authUrl });
+  console.info("[mp-oauth/start] authorize redirect", authorizeDebug);
+  const headers = new Headers(mercadoPagoOAuthAuthorizeDebugHeaders(authorizeDebug));
+  return NextResponse.redirect(browserRedirect, { headers });
 }
 
