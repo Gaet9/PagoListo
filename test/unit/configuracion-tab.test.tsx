@@ -22,15 +22,15 @@ describe("ConfiguracionTab", () => {
         globalThis.fetch = originalFetch;
     });
 
-    it("muestra CTA de conexión y pasos", async () => {
+    it("muestra CTA de conexión sin pasos explicativos", async () => {
         render(<ConfiguracionTab negocioId='n1' />);
         await waitFor(() => {
             expect(screen.getByRole("button", { name: /Conectar con Mercado Pago/i })).toBeInTheDocument();
         });
-        expect(screen.getByText(/Tocá «Conectar con Mercado Pago»/i)).toBeInTheDocument();
+        expect(screen.queryByText(/Tocá «Conectar/i)).not.toBeInTheDocument();
     });
 
-    it("muestra cuenta vinculada con email", async () => {
+    it("muestra cuenta vinculada con Desvincular", async () => {
         globalThis.fetch = vi.fn(async (): Promise<Response> => {
             return new Response(
                 JSON.stringify({
@@ -47,7 +47,7 @@ describe("ConfiguracionTab", () => {
             expect(screen.getByText("kiosco@example.com")).toBeInTheDocument();
         });
         expect(screen.getByText(/99/)).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: /Vincular otra cuenta/i })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Desvincular/i })).toBeInTheDocument();
         expect(screen.getByText("Vinculada")).toBeInTheDocument();
     });
 });
