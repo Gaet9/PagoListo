@@ -102,15 +102,14 @@ export function CobrarMpQrPanel({
                 negocioId,
                 lines.map((line) => ({
                     id: line.productoId,
+                    title: line.title,
                     quantity: line.qty,
+                    unit_price: line.unitPrice,
+                    currency_id: "ARS" as const,
                 })),
             );
             if (cancelled) return;
             if (!pref.ok) {
-                if (pref.mpDisconnected) {
-                    setMpConnected(false);
-                    onMpConnectionChange(false);
-                }
                 setPhase("error");
                 setErrorMessage(pref.message);
                 return;

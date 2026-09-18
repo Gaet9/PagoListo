@@ -11,20 +11,10 @@ export function mercadoPagoCobroPreferenceErrorMessage(status: number, bodyError
     }
     if (status === 400) {
         const trimmed = bodyError?.trim();
-        if (
-            trimmed &&
-            !/^expected a non-empty items array$/i.test(trimmed) &&
-            !/^el carrito debe tener al menos un producto$/i.test(trimmed) &&
-            !/^invalid json body$/i.test(trimmed)
-        ) {
+        if (trimmed && !/^expected a non-empty items array$/i.test(trimmed) && !/^invalid json body$/i.test(trimmed)) {
             return trimmed;
         }
         return "Revisá los productos del carrito.";
-    }
-    if (status === 401 || status === 403) {
-        const trimmed = bodyError?.trim();
-        if (trimmed && trimmed.length <= 200) return trimmed;
-        return "La conexión con Mercado Pago falló. Desvinculá y volvé a vincular en Configuración.";
     }
     if (status === 502 || status >= 500) {
         return "No pudimos generar el QR. Reintentá.";

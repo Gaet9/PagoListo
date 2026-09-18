@@ -3,15 +3,17 @@ import {
     mercadoPagoCobroPreferenceUnknownErrorMessage,
 } from "@/lib/mercadopago/cobro-preference-error-client";
 
-/** Solo identificador y cantidad; precios los resuelve el servidor desde el catálogo. */
 export type CobroPreferenceLine = {
     id: string;
+    title: string;
     quantity: number;
+    unit_price: number;
+    currency_id: "ARS";
 };
 
 export type CreateCobroPreferenceResult =
     | { ok: true; initPoint: string; intentoId: string }
-    | { ok: false; message: string; mpDisconnected?: boolean };
+    | { ok: false; message: string };
 
 export async function createCobroPreferenceClient(
     negocioId: string,
@@ -31,11 +33,7 @@ export async function createCobroPreferenceClient(
             error?: string;
         };
         if (!res.ok) {
-            return {
-                ok: false,
-                message: mercadoPagoCobroPreferenceErrorMessage(res.status, data.error),
-                mpDisconnected: res.status === 409,
-            };
+            return { ok: false, message: mercadoPagoCobroPreferenceErrorMessage(res.status, data.error) };
         }
         const initPoint = data.init_point || data.sandbox_init_point;
         if (!initPoint) {
