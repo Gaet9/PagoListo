@@ -34,7 +34,6 @@ export async function GET(request: NextRequest) {
     if (ventaId) {
         const result = await resolveComprobantePagoForVenta(supabase, ventaId, {
             paymentIdFallback: paymentId,
-            intentoId,
         });
         if (!result.data) {
             return NextResponse.json({ error: result.error ?? "No encontrado" }, { status: result.status });

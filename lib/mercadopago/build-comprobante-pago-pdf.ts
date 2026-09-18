@@ -3,7 +3,6 @@ import { jsPDF } from "jspdf";
 import type { ComprobantePagoData } from "@/lib/mercadopago/comprobante-pago-types";
 import {
     comprobantePagoPdfSafeFilename,
-    formatComprobanteFechaAr,
     formatComprobanteMontoArs,
 } from "@/lib/mercadopago/comprobante-pago-format";
 
@@ -26,7 +25,6 @@ export function buildComprobantePagoPdfDocument(data: ComprobantePagoData): jsPD
 
     const rows: [string, string][] = [
         ["Negocio", data.negocioNombre],
-        ["Fecha", formatComprobanteFechaAr(data.fechaIso)],
         ["Importe", formatComprobanteMontoArs(data.montoArs)],
         ["Referencia de pago", data.referenciaPago],
     ];
@@ -40,15 +38,6 @@ export function buildComprobantePagoPdfDocument(data: ComprobantePagoData): jsPD
         doc.text(wrapped, margin + 52, y);
         y += Math.max(7, wrapped.length * 5.2) + 2;
     }
-
-    y += 6;
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text(
-        `Documento generado por PagoListo el ${new Date().toLocaleString("es-AR")}.`,
-        margin,
-        y,
-    );
 
     return doc;
 }

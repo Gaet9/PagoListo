@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ComprobantePagoApiResponse } from "@/lib/mercadopago/comprobante-pago-types";
+import { resolveReferenciaPagoMercadoPago } from "@/lib/mercadopago/comprobante-pago-referencia";
 
 type VentaMercadoPagoNested = {
     mp_payment_id: string | null;
@@ -38,24 +39,10 @@ function toNumber(v: string | number | null | undefined): number {
     return Number.isFinite(n) ? n : 0;
 }
 
-function buildReferenciaPago(
-    mp: VentaMercadoPagoNested,
-    fallbackPaymentId: string | null,
-    ventaId: string,
-): string {
-    const fromMp = mp?.mp_payment_id?.trim();
-    if (fromMp) return fromMp;
-    const fromUrl = fallbackPaymentId?.trim();
-    if (fromUrl) return fromUrl;
-    const pref = mp?.mp_preference_id?.trim();
-    if (pref) return pref;
-    return ventaId;
-}
-
 export async function resolveComprobantePagoForVenta(
     supabase: SupabaseClient,
     ventaId: string,
-    opts?: { paymentIdFallback?: string | null; intentoId?: string | null },
+    opts?: { paymentIdFallback?: string | null },
 ): Promise<{ data: ComprobantePagoApiResponse | null; error: string | null; status: number }> {
     const { data, error } = await supabase
         .from("ventas")
@@ -80,15 +67,20 @@ export async function resolveComprobantePagoForVenta(
 
     const mp = pickVentaMp(row.venta_mercadopago);
     const monto = toNumber(row.total);
+    const referencia = resolveReferenciaPagoMercadoPago(mp, opts?.paymentIdFallback ?? null);
+    if (!referencia) {
+        return {
+            data: null,
+            error: "Referencia de pago aún no disponible. Reintentá en unos segundos.",
+            status: 404,
+        };
+    }
 
     return {
         data: {
             negocio_nombre: negocioNombre,
             monto_ars: monto,
-            fecha: row.created_at,
-            referencia_pago: buildReferenciaPago(mp, opts?.paymentIdFallback ?? null, row.id),
-            venta_id: row.id,
-            intento_id: opts?.intentoId ?? null,
+            referencia_pago: referencia,
         },
         error: null,
         status: 200,
@@ -132,7 +124,6 @@ export async function resolveComprobantePagoForIntento(
     if (row.venta_id) {
         return resolveComprobantePagoForVenta(supabase, row.venta_id, {
             paymentIdFallback,
-            intentoId: row.id,
         });
     }
 
@@ -150,16 +141,20 @@ export async function resolveComprobantePagoForIntento(
         return { data: null, error: "Negocio no encontrado", status: 404 };
     }
 
-    const referencia = paymentIdFallback?.trim() || row.id;
+    const referencia = resolveReferenciaPagoMercadoPago(null, paymentIdFallback);
+    if (!referencia) {
+        return {
+            data: null,
+            error: "Referencia de pago aún no disponible. Reintentá en unos segundos.",
+            status: 404,
+        };
+    }
 
     return {
         data: {
             negocio_nombre: negocioNombre,
             monto_ars: toNumber(row.expected_total_ars),
-            fecha: row.created_at,
             referencia_pago: referencia,
-            venta_id: null,
-            intento_id: row.id,
         },
         error: null,
         status: 200,

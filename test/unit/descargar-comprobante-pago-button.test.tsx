@@ -27,10 +27,7 @@ describe("DescargarComprobantePagoButton", () => {
             comprobante: {
                 negocio_nombre: "Kiosco",
                 monto_ars: 500,
-                fecha: "2026-01-01T12:00:00.000Z",
                 referencia_pago: "mp-1",
-                venta_id: "v1",
-                intento_id: null,
             },
         });
 
