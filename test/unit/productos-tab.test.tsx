@@ -1,8 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { ProductosTab } from "@/components/tienda/productos-tab";
+import {
+  ProductosTab,
+  canActivateListoSave,
+  LISTO_BLUR_GUARD_MS,
+} from "@/components/tienda/productos-tab";
+
+function pointerTapButton(el: HTMLElement) {
+  fireEvent.pointerUp(el, { pointerType: "mouse", button: 0, isPrimary: true });
+}
 
 const { recordProductoStockMovementMock } = vi.hoisted(() => ({
   recordProductoStockMovementMock: vi.fn().mockResolvedValue({ error: null }),
@@ -175,10 +183,12 @@ describe("ProductosTab", () => {
       .getAllByRole("region")
       .find((r) => r.textContent?.includes("Código de barras"));
     expect(region).toBeTruthy();
-    await user.click(within(region!).getByRole("button", { name: "Modificar" }));
-    await user.click(within(region!).getByRole("button", { name: "Listo" }));
+    pointerTapButton(within(region!).getByRole("button", { name: "Modificar" }));
+    pointerTapButton(within(region!).getByRole("button", { name: "Listo" }));
 
-    expect(toastSuccess).toHaveBeenCalledWith("Producto guardado");
+    await waitFor(() => {
+      expect(toastSuccess).toHaveBeenCalledWith("Producto guardado");
+    });
   });
 
   it("does not save or refresh totals while typing or on blur; only on Listo", async () => {
@@ -221,7 +231,7 @@ describe("ProductosTab", () => {
       .getAllByRole("region")
       .find((r) => r.textContent?.includes("Código de barras"));
     expect(region).toBeTruthy();
-    await user.click(within(region!).getByRole("button", { name: "Modificar" }));
+    pointerTapButton(within(region!).getByRole("button", { name: "Modificar" }));
 
     const ventaInput = within(region!).getByDisplayValue("20");
     await user.clear(ventaInput);
@@ -230,12 +240,13 @@ describe("ProductosTab", () => {
     expect(updateProductoMock).not.toHaveBeenCalled();
     expect(fetchProductosTotalsForNegocioMock.mock.calls.length).toBe(initialTotalsCalls);
 
-    await user.tab();
-
+    fireEvent.blur(ventaInput);
+    pointerTapButton(within(region!).getByRole("button", { name: "Listo" }));
     expect(updateProductoMock).not.toHaveBeenCalled();
-    expect(fetchProductosTotalsForNegocioMock.mock.calls.length).toBe(initialTotalsCalls);
 
-    await user.click(within(region!).getByRole("button", { name: "Listo" }));
+    await new Promise((resolve) => setTimeout(resolve, LISTO_BLUR_GUARD_MS + 40));
+
+    pointerTapButton(within(region!).getByRole("button", { name: "Listo" }));
 
     await waitFor(() => {
       expect(updateProductoMock).toHaveBeenCalled();
@@ -282,7 +293,7 @@ describe("ProductosTab", () => {
     const region = screen
       .getAllByRole("region")
       .find((r) => r.textContent?.includes("Código de barras"));
-    await user.click(within(region!).getByRole("button", { name: "Modificar" }));
+    pointerTapButton(within(region!).getByRole("button", { name: "Modificar" }));
 
     const ventaInput = within(region!).getByDisplayValue("20");
     await user.clear(ventaInput);
@@ -290,11 +301,13 @@ describe("ProductosTab", () => {
     await user.keyboard("{Enter}");
     expect(updateProductoMock).not.toHaveBeenCalled();
 
+    const listo = within(region!).getByRole("button", { name: "Listo" });
+    fireEvent.click(listo);
+    expect(updateProductoMock).not.toHaveBeenCalled();
+
     await user.tab();
     await user.tab();
     expect(updateProductoMock).not.toHaveBeenCalled();
-
-    const listo = within(region!).getByRole("button", { name: "Listo" });
     expect(listo).toHaveAttribute("tabindex", "-1");
   });
 
@@ -338,7 +351,7 @@ describe("ProductosTab", () => {
     const region = screen
       .getAllByRole("region")
       .find((r) => r.textContent?.includes("Código de barras"));
-    await user.click(within(region!).getByRole("button", { name: "Modificar" }));
+    pointerTapButton(within(region!).getByRole("button", { name: "Modificar" }));
 
     fetchProductosTotalsForNegocioMock.mockResolvedValue({
       data: {
@@ -396,18 +409,95 @@ describe("ProductosTab", () => {
     const region = screen
       .getAllByRole("region")
       .find((r) => r.textContent?.includes("Código de barras"));
-    await user.click(within(region!).getByRole("button", { name: "Modificar" }));
+    pointerTapButton(within(region!).getByRole("button", { name: "Modificar" }));
 
     const ventaInput = within(region!).getByDisplayValue("20");
     await user.clear(ventaInput);
     await user.type(ventaInput, "99");
-    await user.keyboard("{Escape}");
+    fireEvent.keyDown(document, { key: "Escape" });
 
     expect(updateProductoMock).not.toHaveBeenCalled();
     expect(fetchProductosTotalsForNegocioMock.mock.calls.length).toBe(initialTotalsCalls);
     const ventaBlock = within(region!).getByText("Venta").parentElement;
     expect(ventaBlock).toHaveTextContent("20");
     expect(within(region!).queryByDisplayValue("99")).not.toBeInTheDocument();
+  });
+
+  it("allows Listo save only after blur guard elapses", async () => {
+    const user = userEvent.setup();
+
+    listProductosPageMock.mockResolvedValue({
+      data: [
+        {
+          id: "p1",
+          negocio_id: "n1",
+          nombre: "Agua",
+          barcode: "1",
+          precio_compra: 10,
+          precio_venta: 20,
+          stock_actual: 3,
+          activo: true,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      error: null,
+    });
+    fetchProductosTotalsForNegocioMock.mockResolvedValue({
+      data: {
+        lineCount: 1,
+        stockTotal: 3,
+        sumPrecioCompra: 10,
+        sumPrecioVenta: 20,
+      },
+      error: null,
+    });
+    updateProductoMock.mockResolvedValue({ data: { id: "p1" }, error: null });
+
+    render(<ProductosTab negocioId="n1" />);
+
+    await screen.findByRole("region", { name: "Totales de productos" });
+    await user.click(await screen.findByRole("button", { name: "Agua" }));
+    const region = screen
+      .getAllByRole("region")
+      .find((r) => r.textContent?.includes("Código de barras"));
+    pointerTapButton(within(region!).getByRole("button", { name: "Modificar" }));
+
+    const ventaInput = within(region!).getByDisplayValue("20");
+    await user.clear(ventaInput);
+    await user.type(ventaInput, "77");
+    fireEvent.blur(ventaInput);
+
+    const listo = within(region!).getByRole("button", { name: "Listo" });
+    pointerTapButton(listo);
+    expect(updateProductoMock).not.toHaveBeenCalled();
+
+    await new Promise((resolve) => setTimeout(resolve, LISTO_BLUR_GUARD_MS + 40));
+    pointerTapButton(listo);
+
+    await waitFor(() => {
+      expect(updateProductoMock).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("canActivateListoSave", () => {
+  it("rejects keyboard-like activation and blur-guard window", () => {
+    const blockedUntil = { current: 0 };
+
+    expect(
+      canActivateListoSave(
+        { button: 0, isPrimary: true, pointerType: "mouse" },
+        blockedUntil,
+      ),
+    ).toBe(true);
+
+    blockedUntil.current = Date.now() + LISTO_BLUR_GUARD_MS;
+    expect(
+      canActivateListoSave(
+        { button: 0, isPrimary: true, pointerType: "mouse" },
+        blockedUntil,
+      ),
+    ).toBe(false);
   });
 });
 

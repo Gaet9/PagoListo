@@ -93,20 +93,29 @@ function formatARS(n: number) {
 }
 
 /** Evita que Enter/Escape en campos disparen guardado o cierre de acordeones Radix. */
-function handleProductEditFieldKeyDown(
-    e: React.KeyboardEvent,
-    onEscape: () => void,
-) {
+/** Tras blur de un campo, ignorar activaciones espurias de Listo (ghost click / teclado). */
+export const LISTO_BLUR_GUARD_MS = 500;
+
+function handleProductEditFieldKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
-        return;
     }
-    if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        onEscape();
-    }
+}
+
+function markListoBlockedAfterFieldBlur(listoBlockedUntilRef: React.MutableRefObject<number>) {
+    listoBlockedUntilRef.current = Date.now() + LISTO_BLUR_GUARD_MS;
+}
+
+export function canActivateListoSave(
+    e: Pick<React.PointerEvent, "button" | "isPrimary" | "pointerType">,
+    listoBlockedUntilRef: React.MutableRefObject<number>,
+): boolean {
+    if (e.button !== 0 || !e.isPrimary) return false;
+    if (Date.now() < listoBlockedUntilRef.current) return false;
+    const type = e.pointerType;
+    if (type !== "mouse" && type !== "touch" && type !== "pen") return false;
+    return true;
 }
 
 function resetRowFormFromRow(
@@ -136,7 +145,6 @@ function ProductoRowEditor({
     onSaved,
     isEditing,
     onStartEdit,
-    onCancelEdit,
     onDoneEdit,
 }: {
     row: ProductoRow;
@@ -144,7 +152,6 @@ function ProductoRowEditor({
     onSaved: (patch: Pick<ProductoRow, "nombre" | "barcode" | "precio_compra" | "precio_venta" | "stock_actual" | "activo">) => void;
     isEditing: boolean;
     onStartEdit: () => void;
-    onCancelEdit: () => void;
     onDoneEdit: () => void;
 }) {
     const [nombre, setNombre] = useState(row.nombre);
@@ -161,6 +168,7 @@ function ProductoRowEditor({
     const guardarInFlightRef = useRef(false);
     const editBaselineRef = useRef<ProductoRow | null>(null);
     const wasEditingRef = useRef(false);
+    const listoBlockedUntilRef = useRef(0);
 
     const resetFormFromRow = useCallback(
         (source: ProductoRow) => {
@@ -191,12 +199,6 @@ function ProductoRowEditor({
             wasEditingRef.current = true;
         }
     }, [isEditing, resetFormFromRow, row]);
-
-    const cancelEditing = useCallback(() => {
-        const baseline = editBaselineRef.current ?? row;
-        resetFormFromRow(baseline);
-        onCancelEdit();
-    }, [onCancelEdit, resetFormFromRow, row]);
 
     const guardar = useCallback(
         async (opts?: { notifySuccess?: boolean; listoButton?: boolean }) => {
@@ -285,6 +287,15 @@ function ProductoRowEditor({
         [activo, barcode, nombre, onSaved, precioCompra, precioVenta, row.id, row.negocio_id, row.stock_actual, stock],
     );
 
+    const confirmListoSave = useCallback(async () => {
+        const ok = await guardar({ notifySuccess: true, listoButton: true });
+        if (ok) onDoneEdit();
+    }, [guardar, onDoneEdit]);
+
+    const handleEditFieldBlur = useCallback(() => {
+        markListoBlockedAfterFieldBlur(listoBlockedUntilRef);
+    }, []);
+
     const eliminar = async () => {
         setDeleting(true);
         setMsg(null);
@@ -316,13 +327,22 @@ function ProductoRowEditor({
                 className='h-8 gap-1 px-2'
                 disabled={deleting}
                 tabIndex={isEditing ? -1 : 0}
-                onClick={async () => {
+                onKeyDown={(e) => {
+                    if (isEditing && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                }}
+                onClick={(e) => {
+                    e.preventDefault();
+                }}
+                onPointerUp={async (e) => {
+                    if (!canActivateListoSave(e, listoBlockedUntilRef)) return;
                     if (!isEditing) {
                         onStartEdit();
                         return;
                     }
-                    const ok = await guardar({ notifySuccess: true, listoButton: true });
-                    if (ok) onDoneEdit();
+                    await confirmListoSave();
                 }}
                 aria-label={isEditing ? "Listo" : "Modificar"}>
                 {isEditing ?
@@ -384,7 +404,8 @@ function ProductoRowEditor({
                                             <Input
                                                 value={barcode}
                                                 onChange={(e) => setBarcode(e.target.value)}
-                                                onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                                                onBlur={handleEditFieldBlur}
+                                                onKeyDown={(e) => handleProductEditFieldKeyDown(e)}
                                                 className='h-9 text-sm'
                                             />
                                         :   <p className='text-sm'>{barcode || "-"}</p>}
@@ -397,7 +418,8 @@ function ProductoRowEditor({
                                                 <Input
                                                     value={precioCompra}
                                                     onChange={(e) => setPrecioCompra(sanitizeDecimalInput(e.target.value))}
-                                                    onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                                                    onBlur={handleEditFieldBlur}
+                                                    onKeyDown={(e) => handleProductEditFieldKeyDown(e)}
                                                     className='h-9 text-sm'
                                                     inputMode='decimal'
                                                     pattern='[0-9.,]*'
@@ -410,7 +432,8 @@ function ProductoRowEditor({
                                                 <Input
                                                     value={precioVenta}
                                                     onChange={(e) => setPrecioVenta(sanitizeDecimalInput(e.target.value))}
-                                                    onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                                                    onBlur={handleEditFieldBlur}
+                                                    onKeyDown={(e) => handleProductEditFieldKeyDown(e)}
                                                     className='h-9 text-sm'
                                                     inputMode='decimal'
                                                     pattern='[0-9.,]*'
@@ -423,7 +446,8 @@ function ProductoRowEditor({
                                                 <Input
                                                     value={stock}
                                                     onChange={(e) => setStock(sanitizeIntInput(e.target.value))}
-                                                    onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                                                    onBlur={handleEditFieldBlur}
+                                                    onKeyDown={(e) => handleProductEditFieldKeyDown(e)}
                                                     className='h-9 text-sm'
                                                     inputMode='numeric'
                                                     pattern='[0-9]*'
@@ -468,7 +492,8 @@ function ProductoRowEditor({
                         <Input
                             value={nombre}
                             onChange={(e) => setNombre(e.target.value)}
-                            onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                            onBlur={handleEditFieldBlur}
+                            onKeyDown={(e) => handleProductEditFieldKeyDown(e)}
                             className='h-8 text-sm'
                         />
                     :   <span className='text-sm truncate block'>{nombre}</span>}
@@ -478,7 +503,8 @@ function ProductoRowEditor({
                         <Input
                             value={barcode}
                             onChange={(e) => setBarcode(e.target.value)}
-                            onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                            onBlur={handleEditFieldBlur}
+                            onKeyDown={(e) => handleProductEditFieldKeyDown(e)}
                             className='h-8 text-sm'
                         />
                     :   <span className='text-sm truncate block'>{barcode || "-"}</span>}
@@ -488,7 +514,8 @@ function ProductoRowEditor({
                         <Input
                             value={precioCompra}
                             onChange={(e) => setPrecioCompra(sanitizeDecimalInput(e.target.value))}
-                            onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                            onBlur={handleEditFieldBlur}
+                            onKeyDown={(e) => handleProductEditFieldKeyDown(e)}
                             className='h-8 text-sm'
                             inputMode='decimal'
                             pattern='[0-9.,]*'
@@ -500,7 +527,8 @@ function ProductoRowEditor({
                         <Input
                             value={precioVenta}
                             onChange={(e) => setPrecioVenta(sanitizeDecimalInput(e.target.value))}
-                            onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                            onBlur={handleEditFieldBlur}
+                            onKeyDown={(e) => handleProductEditFieldKeyDown(e)}
                             className='h-8 text-sm'
                             inputMode='decimal'
                             pattern='[0-9.,]*'
@@ -512,7 +540,8 @@ function ProductoRowEditor({
                         <Input
                             value={stock}
                             onChange={(e) => setStock(sanitizeIntInput(e.target.value))}
-                            onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                            onBlur={handleEditFieldBlur}
+                            onKeyDown={(e) => handleProductEditFieldKeyDown(e)}
                             className='h-8 text-sm'
                             inputMode='numeric'
                             pattern='[0-9]*'
@@ -562,7 +591,7 @@ export function ProductosTab({ negocioId }: Props) {
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
     const [editingRowId, setEditingRowId] = useState<string | null>(null);
-    const [totalsWhileEditing, setTotalsWhileEditing] = useState<ProductosTotals | null>(null);
+    const [frozenFooterTotals, setFrozenFooterTotals] = useState<ProductosTotals | null>(null);
     const editingRowIdRef = useRef<string | null>(null);
     editingRowIdRef.current = editingRowId;
     const [addAccordionValue, setAddAccordionValue] = useState<string>("");
@@ -581,6 +610,10 @@ export function ProductosTab({ negocioId }: Props) {
     }, [searchInput]);
 
     const loadFirstPage = useCallback(async () => {
+        if (editingRowIdRef.current !== null) {
+            return;
+        }
+
         setLoadingInitial(true);
         setError(null);
         setHasMore(true);
@@ -636,9 +669,11 @@ export function ProductosTab({ negocioId }: Props) {
         const search = debouncedSearch || undefined;
         const totalsRes = await fetchProductosTotalsForNegocio(supabase, negocioId, { search });
         if (totalsRes.error) {
-            setTotals(null);
-            setTotalsError(totalsRes.error.message);
-        } else {
+            if (editingRowIdRef.current === null) {
+                setTotals(null);
+                setTotalsError(totalsRes.error.message);
+            }
+        } else if (editingRowIdRef.current === null || opts?.force) {
             setTotals(totalsRes.data);
             setTotalsError(null);
         }
@@ -657,7 +692,8 @@ export function ProductosTab({ negocioId }: Props) {
 
     const beginEditRow = useCallback(
         (rowId: string) => {
-            setTotalsWhileEditing(totals);
+            if (!totals) return;
+            setFrozenFooterTotals(totals);
             setEditingRowId(rowId);
         },
         [totals],
@@ -665,15 +701,29 @@ export function ProductosTab({ negocioId }: Props) {
 
     const cancelEditRow = useCallback(() => {
         setEditingRowId(null);
-        setTotalsWhileEditing(null);
+        setFrozenFooterTotals(null);
     }, []);
 
     const finishEditRow = useCallback(() => {
         setEditingRowId(null);
-        setTotalsWhileEditing(null);
+        setFrozenFooterTotals(null);
     }, []);
 
-    const displayTotals = totalsWhileEditing ?? totals;
+    const displayTotals = editingRowId !== null && frozenFooterTotals ? frozenFooterTotals : totals;
+
+    useEffect(() => {
+        if (!editingRowId) return;
+
+        const onEscape = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            e.preventDefault();
+            e.stopPropagation();
+            cancelEditRow();
+        };
+
+        document.addEventListener("keydown", onEscape, true);
+        return () => document.removeEventListener("keydown", onEscape, true);
+    }, [cancelEditRow, editingRowId]);
 
     const loadMore = useCallback(async () => {
         if (!hasMore || loadingMore || !nextCursor) return;
@@ -962,7 +1012,6 @@ export function ProductosTab({ negocioId }: Props) {
                                         onSaved={(patch) => handleProductoSaved(row.id, patch)}
                                         isEditing={editingRowId === row.id}
                                         onStartEdit={() => beginEditRow(row.id)}
-                                        onCancelEdit={cancelEditRow}
                                         onDoneEdit={finishEditRow}
                                     />
                                 ))
