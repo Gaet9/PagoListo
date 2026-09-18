@@ -15,7 +15,7 @@ describe("parsePositiveIntQuantity", () => {
   it("rejects decimals (RPC truncates qty to int)", () => {
     const r = parsePositiveIntQuantity(2.7, "items[0].quantity");
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("positive integer");
+    if (!r.ok) expect(r.error).toMatch(/entero positivo/i);
   });
 
   it("rejects zero and negatives", () => {
@@ -63,6 +63,6 @@ describe("buildCobroQuantityByProduct", () => {
   it("requires product id", () => {
     const r = buildCobroQuantityByProduct([{ quantity: 1 }]);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("items[0].id");
+    if (!r.ok) expect(r.error).toMatch(/línea 1/i);
   });
 });

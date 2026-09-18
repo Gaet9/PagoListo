@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { COBRO_API_ERROR_MESSAGES } from "@/lib/mercadopago/cobro-api-errors";
+import { mercadoPagoCobroPreferenceErrorMessage } from "@/lib/mercadopago/cobro-preference-api-error";
 import { resolveCobroPreferenceLines, type CobroLineRequest } from "@/lib/mercadopago/cobro-preference-lines";
 import { getMercadoPagoClientForAccessToken } from "@/lib/mercadopago/client";
 import { buildMercadoPagoCobroWebhookUrl } from "@/lib/mercadopago/cobro-webhook-url";
@@ -21,12 +23,26 @@ function parseBody(json: unknown): PostBody | null {
   return json as PostBody;
 }
 
+function mercadoPagoSdkErrorMessage(e: unknown): { message: string; status?: number } {
+  if (e && typeof e === "object") {
+    const rec = e as Record<string, unknown>;
+    const status = typeof rec.status === "number" ? rec.status : undefined;
+    const message =
+      typeof rec.message === "string" ? rec.message
+      : typeof rec.error === "string" ? rec.error
+      : e instanceof Error ? e.message
+      : "Unknown error";
+    return { message, status };
+  }
+  return { message: e instanceof Error ? e.message : "Unknown error" };
+}
+
 export async function POST(request: NextRequest) {
   let json: unknown;
   try {
     json = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: COBRO_API_ERROR_MESSAGES.invalidJson }, { status: 400 });
   }
 
   const body = parseBody(json);
@@ -35,7 +51,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Falta negocioId" }, { status: 400 });
   }
   if (!body?.items?.length) {
-    return NextResponse.json({ error: "Expected a non-empty items array" }, { status: 400 });
+    return NextResponse.json({ error: "El carrito debe tener al menos un producto" }, { status: 400 });
   }
 
   const supabase = await createClient();
@@ -44,7 +60,7 @@ export async function POST(request: NextRequest) {
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: COBRO_API_ERROR_MESSAGES.unauthorized }, { status: 401 });
   }
 
   const { data: negocio, error: negocioErr } = await supabase.from("negocios").select("id").eq("id", negocioId).single();
@@ -63,11 +79,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Mercado Pago no está conectado para este negocio" }, { status: 409 });
   }
 
+  const intentoId = crypto.randomUUID();
+
+  const { error: intentoInsertErr } = await admin.from("mp_cobro_intentos").insert({
+    id: intentoId,
+    negocio_id: negocioId,
+    usuario_id: user.id,
+    items: resolved.intentoItems,
+    mp_preference_id: null,
+    expected_total_ars: resolved.expectedTotalArs,
+  });
+  if (intentoInsertErr) {
+    return NextResponse.json(
+      { error: intentoInsertErr.message || "No se pudo crear el intento de cobro." },
+      { status: 500 },
+    );
+  }
+
   try {
     const baseUrl = getPublicSiteBaseUrl();
     const back_urls = buildCheckoutProBackUrls(baseUrl);
-
-    const intentoId = crypto.randomUUID();
 
     const prefBody: PreferenceRequest = {
       items: resolved.mpItems,
@@ -86,33 +117,28 @@ export async function POST(request: NextRequest) {
 
     const id = created.id;
     if (!id) {
-      throw new Error("Mercado Pago preference response did not include an id");
+      throw new Error("Mercado Pago no devolvió el id de la preferencia");
     }
 
-    const { data: intentoRow, error: intentoErr } = await admin
+    const { error: intentoUpdateErr } = await admin
       .from("mp_cobro_intentos")
-      .insert({
-        id: intentoId,
-        negocio_id: negocioId,
-        usuario_id: user.id,
-        items: resolved.intentoItems,
-        mp_preference_id: id,
-        expected_total_ars: resolved.expectedTotalArs,
-      })
-      .select("id")
-      .single();
-    if (intentoErr || !intentoRow?.id) {
-      throw new Error(intentoErr?.message || "No se pudo crear el intento de cobro.");
+      .update({ mp_preference_id: id })
+      .eq("id", intentoId);
+    if (intentoUpdateErr) {
+      throw new Error(intentoUpdateErr.message || "No se pudo actualizar el intento de cobro.");
     }
 
     return NextResponse.json({
       id,
       init_point: created.init_point,
       sandbox_init_point: created.sandbox_init_point,
-      intento_id: intentoRow.id,
+      intento_id: intentoId,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 502 });
+    await admin.from("mp_cobro_intentos").delete().eq("id", intentoId);
+    const { message, status } = mercadoPagoSdkErrorMessage(e);
+    const friendly = mercadoPagoCobroPreferenceErrorMessage(message, status);
+    const httpStatus = status === 401 || status === 403 ? status : 502;
+    return NextResponse.json({ error: friendly }, { status: httpStatus });
   }
 }

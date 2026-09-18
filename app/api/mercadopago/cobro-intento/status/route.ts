@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { COBRO_API_ERROR_MESSAGES } from "@/lib/mercadopago/cobro-api-errors";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: COBRO_API_ERROR_MESSAGES.unauthorized }, { status: 401 });
   }
 
   const admin = createAdminClient();
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
 
   // Only the same user that created the intento can poll its status.
   if (row.usuario_id !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: COBRO_API_ERROR_MESSAGES.forbiddenIntento }, { status: 403 });
   }
 
   return NextResponse.json({

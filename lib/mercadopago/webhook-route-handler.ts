@@ -8,6 +8,7 @@ import {
   parseMercadoPagoWebhookNotification,
   type MercadoPagoWebhookPayload,
 } from "@/lib/mercadopago/webhook-notification-parse";
+import { cobroWebhookPaymentPreferenceMatchesIntento } from "@/lib/mercadopago/cobro-webhook-preference-match";
 import { fetchMercadoPagoCobroPayment } from "@/lib/mercadopago/webhook-cobro-payment";
 import { getMercadoPagoSaasAccessToken } from "@/lib/mercadopago/server";
 import {
@@ -209,7 +210,7 @@ export async function handleMercadoPagoWebhookRequest(request: NextRequest) {
     return NextResponse.json({ ok: true }, { status: 200 });
   }
 
-  if (preferenceId && intento.mp_preference_id !== preferenceId) {
+  if (!cobroWebhookPaymentPreferenceMatchesIntento(intento.mp_preference_id, preferenceId)) {
     console.warn("[mercadopago:webhook] preference_mismatch", {
       externalRef,
       intento_mp_preference_id: intento.mp_preference_id,
@@ -258,11 +259,18 @@ export async function handleMercadoPagoWebhookRequest(request: NextRequest) {
     return NextResponse.json({ ok: true }, { status: 200 });
   }
 
+  const mpPreferenceIdForVenta =
+    (typeof intento.mp_preference_id === "string" && intento.mp_preference_id.trim()) || preferenceId;
+  if (!mpPreferenceIdForVenta) {
+    console.warn("[mercadopago:webhook] missing_mp_preference_id", { paymentId, intentoId: intento.id });
+    return NextResponse.json({ ok: true }, { status: 200 });
+  }
+
   const { data: ventaId, error: ventaErr } = await admin.rpc("create_venta_mercadopago_aprobada", {
     p_negocio_id: intento.negocio_id,
     p_usuario_id: intento.usuario_id,
     p_items: intento.items,
-    p_mp_preference_id: intento.mp_preference_id,
+    p_mp_preference_id: mpPreferenceIdForVenta,
     p_mp_payment_id: paymentId,
     p_payment_status: status,
   });
