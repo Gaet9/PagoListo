@@ -1,10 +1,21 @@
 import type { ProductosTotals } from "@/lib/queries/productos";
 import type { ProductoRow } from "@/lib/types/negocio";
 
-export type ProductoEditablePatch = Pick<
-  ProductoRow,
-  "nombre" | "barcode" | "precio_compra" | "precio_venta" | "stock_actual" | "activo"
->;
+/** Valores normalizados del formulario al confirmar Listo (no confundir con `ProductoRow` en DB). */
+export type ProductoEditablePatch = {
+  nombre: string;
+  barcode: string | null;
+  precio_compra: number;
+  precio_venta: number;
+  stock_actual: number;
+  activo: boolean;
+};
+
+function parseMoneyField(v: string | number | null | undefined): number {
+  const n =
+    typeof v === "number" ? v : parseFloat(String(v ?? "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
 
 export function cloneProductosTotals(t: ProductosTotals): ProductosTotals {
   return {
@@ -21,14 +32,14 @@ export function applyProductoPatchDeltaToTotals(
   prevRow: Pick<ProductoRow, "precio_compra" | "precio_venta" | "stock_actual">,
   patch: Pick<ProductoEditablePatch, "precio_compra" | "precio_venta" | "stock_actual">,
 ): ProductosTotals {
-  const stockDelta = patch.stock_actual - prevRow.stock_actual;
-  const compraDelta = patch.precio_compra - prevRow.precio_compra;
-  const ventaDelta = patch.precio_venta - prevRow.precio_venta;
+  const prevCompra = parseMoneyField(prevRow.precio_compra);
+  const prevVenta = parseMoneyField(prevRow.precio_venta);
+  const stockDelta = patch.stock_actual - (Number(prevRow.stock_actual) || 0);
 
   return {
     lineCount: totals.lineCount,
     stockTotal: totals.stockTotal + stockDelta,
-    sumPrecioCompra: totals.sumPrecioCompra + compraDelta,
-    sumPrecioVenta: totals.sumPrecioVenta + ventaDelta,
+    sumPrecioCompra: totals.sumPrecioCompra + (patch.precio_compra - prevCompra),
+    sumPrecioVenta: totals.sumPrecioVenta + (patch.precio_venta - prevVenta),
   };
 }
