@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { ProductosTab } from "@/components/tienda/productos-tab";
@@ -179,6 +179,117 @@ describe("ProductosTab", () => {
     await user.click(within(region!).getByRole("button", { name: "Listo" }));
 
     expect(toastSuccess).toHaveBeenCalledWith("Producto guardado");
+  });
+
+  it("does not save or refresh totals while typing a price; commits on blur", async () => {
+    const user = userEvent.setup();
+
+    listProductosPageMock.mockResolvedValue({
+      data: [
+        {
+          id: "p1",
+          negocio_id: "n1",
+          nombre: "Agua",
+          barcode: "1",
+          precio_compra: 10,
+          precio_venta: 20,
+          stock_actual: 3,
+          activo: true,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      error: null,
+    });
+    fetchProductosTotalsForNegocioMock.mockResolvedValue({
+      data: {
+        lineCount: 1,
+        stockTotal: 3,
+        sumPrecioCompra: 10,
+        sumPrecioVenta: 20,
+      },
+      error: null,
+    });
+    updateProductoMock.mockResolvedValue({ data: { id: "p1" }, error: null });
+
+    render(<ProductosTab negocioId="n1" />);
+
+    await screen.findByRole("region", { name: "Totales de productos" });
+    const initialTotalsCalls = fetchProductosTotalsForNegocioMock.mock.calls.length;
+
+    await user.click(await screen.findByRole("button", { name: "Agua" }));
+    const region = screen
+      .getAllByRole("region")
+      .find((r) => r.textContent?.includes("Código de barras"));
+    expect(region).toBeTruthy();
+    await user.click(within(region!).getByRole("button", { name: "Modificar" }));
+
+    const ventaInput = within(region!).getByDisplayValue("20");
+    await user.clear(ventaInput);
+    await user.type(ventaInput, "99");
+
+    expect(updateProductoMock).not.toHaveBeenCalled();
+    expect(fetchProductosTotalsForNegocioMock.mock.calls.length).toBe(initialTotalsCalls);
+
+    await user.tab();
+
+    await waitFor(() => {
+      expect(updateProductoMock).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(fetchProductosTotalsForNegocioMock.mock.calls.length).toBeGreaterThan(initialTotalsCalls);
+    });
+  });
+
+  it("Escape cancels price edit without saving or refreshing totals", async () => {
+    const user = userEvent.setup();
+
+    listProductosPageMock.mockResolvedValue({
+      data: [
+        {
+          id: "p1",
+          negocio_id: "n1",
+          nombre: "Agua",
+          barcode: "1",
+          precio_compra: 10,
+          precio_venta: 20,
+          stock_actual: 3,
+          activo: true,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      error: null,
+    });
+    fetchProductosTotalsForNegocioMock.mockResolvedValue({
+      data: {
+        lineCount: 1,
+        stockTotal: 3,
+        sumPrecioCompra: 10,
+        sumPrecioVenta: 20,
+      },
+      error: null,
+    });
+
+    render(<ProductosTab negocioId="n1" />);
+
+    await screen.findByRole("region", { name: "Totales de productos" });
+    const initialTotalsCalls = fetchProductosTotalsForNegocioMock.mock.calls.length;
+
+    await user.click(await screen.findByRole("button", { name: "Agua" }));
+    const region = screen
+      .getAllByRole("region")
+      .find((r) => r.textContent?.includes("Código de barras"));
+    await user.click(within(region!).getByRole("button", { name: "Modificar" }));
+
+    const ventaInput = within(region!).getByDisplayValue("20");
+    await user.clear(ventaInput);
+    await user.type(ventaInput, "99");
+    await user.keyboard("{Escape}");
+
+    expect(updateProductoMock).not.toHaveBeenCalled();
+    expect(fetchProductosTotalsForNegocioMock.mock.calls.length).toBe(initialTotalsCalls);
+    const ventaBlock = within(region!).getByText("Venta").parentElement;
+    expect(ventaBlock).toHaveTextContent("20");
+    expect(within(region!).queryByDisplayValue("99")).not.toBeInTheDocument();
   });
 });
 
