@@ -7,6 +7,7 @@ import type { KeysetCursor } from "@/lib/types/pagination";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { VentasAreaChart } from "@/components/tienda/ventas-area-chart";
+import { DescargarComprobantePagoButton } from "@/components/mercadopago/descargar-comprobante-pago-button";
 import { VentaItemsPanel } from "@/components/tienda/venta-items-panel";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -137,9 +138,6 @@ export function VentasTab({ negocioId }: Props) {
 
             <VentasAreaChart negocioId={negocioId} />
 
-            <p className='text-sm text-muted-foreground'>
-                Vista de solo lectura. Las ventas se registrarán desde el punto de venta cuando lo implementes.
-            </p>
             <div className='rounded-lg border overflow-hidden bg-card'>
                 {rows.length === 0 ?
                     <div className='p-6 text-center text-muted-foreground text-sm'>No hay ventas registradas.</div>
@@ -177,8 +175,13 @@ export function VentasTab({ negocioId }: Props) {
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className='px-4'>
-                                        <div className='app-accordion-detail-venta'>
+                                        <div className='app-accordion-detail-venta flex flex-col gap-3'>
                                             <VentaItemsPanel ventaId={v.id} />
+                                            {v.metodo_pago === "mercado_pago" && v.estado === "completed" ?
+                                                <div className='flex justify-end pt-1'>
+                                                    <DescargarComprobantePagoButton ventaId={v.id} />
+                                                </div>
+                                            :   null}
                                         </div>
                                     </AccordionContent>
                                 </AccordionItem>

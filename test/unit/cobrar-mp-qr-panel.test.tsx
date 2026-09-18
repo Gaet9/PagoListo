@@ -80,6 +80,7 @@ describe("CobrarMpQrPanel", () => {
 
         await waitFor(() => {
             expect(onApproved).toHaveBeenCalledTimes(1);
+            expect(onApproved).toHaveBeenCalledWith("v1");
         });
     });
 

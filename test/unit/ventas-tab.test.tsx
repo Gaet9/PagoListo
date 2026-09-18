@@ -21,6 +21,12 @@ vi.mock("@/components/tienda/ventas-area-chart", () => ({
   VentasAreaChart: () => null,
 }));
 
+vi.mock("@/components/mercadopago/descargar-comprobante-pago-button", () => ({
+  DescargarComprobantePagoButton: ({ ventaId }: { ventaId?: string }) => (
+    <button type="button">Comprobante {ventaId}</button>
+  ),
+}));
+
 describe("VentasTab", () => {
   beforeEach(() => {
     listVentasPageMock.mockReset();
@@ -67,5 +73,30 @@ describe("VentasTab", () => {
 
     expect(await screen.findByText("Coca Cola")).toBeInTheDocument();
     expect(screen.getByText(/2 ×/)).toBeInTheDocument();
+  });
+
+  it("muestra descarga de comprobante para ventas Mercado Pago", async () => {
+    const user = userEvent.setup();
+    listVentasPageMock.mockResolvedValue({
+      data: [
+        {
+          id: "v-mp",
+          negocio_id: "n1",
+          usuario_id: "u1",
+          total: 1500,
+          metodo_pago: "mercado_pago",
+          estado: "completed",
+          created_at: new Date("2026-01-02T12:30:00.000Z").toISOString(),
+        },
+      ],
+      error: null,
+    });
+    listVentaItemsByVentaIdMock.mockResolvedValue({ data: [], error: null });
+
+    render(<VentasTab negocioId="n1" />);
+    const trigger = await screen.findByRole("button", { name: /Venta/i });
+    await user.click(trigger);
+
+    expect(await screen.findByRole("button", { name: "Comprobante v-mp" })).toBeInTheDocument();
   });
 });
