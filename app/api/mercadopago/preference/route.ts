@@ -9,7 +9,7 @@ import { getMercadoPagoAccessTokenForNegocio } from "@/lib/mercadopago/negocio-a
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { Preference } from "mercadopago";
-import type { PreferenceRequest } from "mercadopago/dist/clients/commonTypes";
+import type { PreferenceRequest } from "mercadopago/dist/clients/preference/commonTypes";
 import crypto from "crypto";
 
 type PostBody = {
