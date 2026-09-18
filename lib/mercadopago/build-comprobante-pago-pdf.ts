@@ -31,10 +31,6 @@ export function buildComprobantePagoPdfDocument(data: ComprobantePagoData): jsPD
         ["Referencia de pago", data.referenciaPago],
     ];
 
-    if (data.ventaId) {
-        rows.push(["Venta", data.ventaId]);
-    }
-
     doc.setFontSize(11);
     for (const [label, value] of rows) {
         doc.setFont("helvetica", "bold");
