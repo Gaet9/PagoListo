@@ -155,8 +155,9 @@ function ProductoRowEditor({
     }, [row]);
 
     useEffect(() => {
+        if (isEditing) return;
         resetFormFromRow();
-    }, [resetFormFromRow]);
+    }, [isEditing, resetFormFromRow]);
 
     const guardar = useCallback(
         async (opts?: { notifySuccess?: boolean }) => {
@@ -169,7 +170,6 @@ function ProductoRowEditor({
                 activo,
             };
 
-            // Avoid pointless writes while user is still typing.
             if (!patch.nombre) return false;
 
             const key = JSON.stringify(patch);
@@ -224,15 +224,17 @@ function ProductoRowEditor({
                     }
                 }
                 lastSavedKeyRef.current = key;
-                if (opts?.notifySuccess) toast.success("Producto guardado");
-                onSaved({
-                    nombre: patch.nombre,
-                    barcode: patch.barcode,
-                    precio_compra: patch.precio_compra,
-                    precio_venta: patch.precio_venta,
-                    stock_actual: patch.stock_actual,
-                    activo: patch.activo,
-                });
+                if (opts?.notifySuccess) {
+                    toast.success("Producto guardado");
+                    onSaved({
+                        nombre: patch.nombre,
+                        barcode: patch.barcode,
+                        precio_compra: patch.precio_compra,
+                        precio_venta: patch.precio_venta,
+                        stock_actual: patch.stock_actual,
+                        activo: patch.activo,
+                    });
+                }
                 return true;
             } finally {
                 guardarInFlightRef.current = false;
@@ -241,18 +243,6 @@ function ProductoRowEditor({
         },
         [activo, barcode, nombre, onSaved, precioCompra, precioVenta, row.id, row.negocio_id, row.stock_actual, stock],
     );
-
-    const commitEdits = useCallback(() => {
-        if (!isEditing || deleting) return;
-        void guardar();
-    }, [deleting, guardar, isEditing]);
-
-    const handleFieldKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            commitEdits();
-        }
-    };
 
     useEffect(() => {
         if (!isEditing) return;
@@ -363,8 +353,6 @@ function ProductoRowEditor({
                                             <Input
                                                 value={barcode}
                                                 onChange={(e) => setBarcode(e.target.value)}
-                                                onBlur={commitEdits}
-                                                onKeyDown={handleFieldKeyDown}
                                                 className='h-9 text-sm'
                                             />
                                         :   <p className='text-sm'>{barcode || "-"}</p>}
@@ -377,8 +365,6 @@ function ProductoRowEditor({
                                                 <Input
                                                     value={precioCompra}
                                                     onChange={(e) => setPrecioCompra(sanitizeDecimalInput(e.target.value))}
-                                                    onBlur={commitEdits}
-                                                    onKeyDown={handleFieldKeyDown}
                                                     className='h-9 text-sm'
                                                     inputMode='decimal'
                                                     pattern='[0-9.,]*'
@@ -391,8 +377,6 @@ function ProductoRowEditor({
                                                 <Input
                                                     value={precioVenta}
                                                     onChange={(e) => setPrecioVenta(sanitizeDecimalInput(e.target.value))}
-                                                    onBlur={commitEdits}
-                                                    onKeyDown={handleFieldKeyDown}
                                                     className='h-9 text-sm'
                                                     inputMode='decimal'
                                                     pattern='[0-9.,]*'
@@ -405,8 +389,6 @@ function ProductoRowEditor({
                                                 <Input
                                                     value={stock}
                                                     onChange={(e) => setStock(sanitizeIntInput(e.target.value))}
-                                                    onBlur={commitEdits}
-                                                    onKeyDown={handleFieldKeyDown}
                                                     className='h-9 text-sm'
                                                     inputMode='numeric'
                                                     pattern='[0-9]*'
@@ -450,8 +432,6 @@ function ProductoRowEditor({
                     <Input
                         value={nombre}
                         onChange={(e) => setNombre(e.target.value)}
-                        onBlur={isEditing ? commitEdits : undefined}
-                        onKeyDown={isEditing ? handleFieldKeyDown : undefined}
                         className='h-8 text-sm'
                         readOnly={!isEditing}
                     />
@@ -460,8 +440,6 @@ function ProductoRowEditor({
                     <Input
                         value={barcode}
                         onChange={(e) => setBarcode(e.target.value)}
-                        onBlur={isEditing ? commitEdits : undefined}
-                        onKeyDown={isEditing ? handleFieldKeyDown : undefined}
                         className='h-8 text-sm'
                         readOnly={!isEditing}
                     />
@@ -470,8 +448,6 @@ function ProductoRowEditor({
                     <Input
                         value={precioCompra}
                         onChange={(e) => setPrecioCompra(sanitizeDecimalInput(e.target.value))}
-                        onBlur={isEditing ? commitEdits : undefined}
-                        onKeyDown={isEditing ? handleFieldKeyDown : undefined}
                         className='h-8 text-sm'
                         inputMode='decimal'
                         readOnly={!isEditing}
@@ -482,8 +458,6 @@ function ProductoRowEditor({
                     <Input
                         value={precioVenta}
                         onChange={(e) => setPrecioVenta(sanitizeDecimalInput(e.target.value))}
-                        onBlur={isEditing ? commitEdits : undefined}
-                        onKeyDown={isEditing ? handleFieldKeyDown : undefined}
                         className='h-8 text-sm'
                         inputMode='decimal'
                         readOnly={!isEditing}
@@ -494,8 +468,6 @@ function ProductoRowEditor({
                     <Input
                         value={stock}
                         onChange={(e) => setStock(sanitizeIntInput(e.target.value))}
-                        onBlur={isEditing ? commitEdits : undefined}
-                        onKeyDown={isEditing ? handleFieldKeyDown : undefined}
                         className='h-8 text-sm'
                         inputMode='numeric'
                         readOnly={!isEditing}

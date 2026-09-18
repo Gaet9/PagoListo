@@ -181,7 +181,7 @@ describe("ProductosTab", () => {
     expect(toastSuccess).toHaveBeenCalledWith("Producto guardado");
   });
 
-  it("does not save or refresh totals while typing a price; commits on blur", async () => {
+  it("does not save or refresh totals while typing or on blur; only on Listo", async () => {
     const user = userEvent.setup();
 
     listProductosPageMock.mockResolvedValue({
@@ -231,6 +231,11 @@ describe("ProductosTab", () => {
     expect(fetchProductosTotalsForNegocioMock.mock.calls.length).toBe(initialTotalsCalls);
 
     await user.tab();
+
+    expect(updateProductoMock).not.toHaveBeenCalled();
+    expect(fetchProductosTotalsForNegocioMock.mock.calls.length).toBe(initialTotalsCalls);
+
+    await user.click(within(region!).getByRole("button", { name: "Listo" }));
 
     await waitFor(() => {
       expect(updateProductoMock).toHaveBeenCalled();
