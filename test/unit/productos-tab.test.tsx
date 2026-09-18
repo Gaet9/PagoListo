@@ -409,5 +409,128 @@ describe("ProductosTab", () => {
     expect(ventaBlock).toHaveTextContent("20");
     expect(within(region!).queryByDisplayValue("99")).not.toBeInTheDocument();
   });
+
+  it("GAE-39: Listo exits edit and updates footer totals before PATCH resolves", async () => {
+    const user = userEvent.setup();
+    let resolveUpdate: (value: { data: { id: string }; error: null }) => void = () => {};
+    updateProductoMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveUpdate = resolve;
+        }),
+    );
+
+    listProductosPageMock.mockResolvedValue({
+      data: [
+        {
+          id: "p1",
+          negocio_id: "n1",
+          nombre: "Agua",
+          barcode: "1",
+          precio_compra: 10,
+          precio_venta: 20,
+          stock_actual: 3,
+          activo: true,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      error: null,
+    });
+    fetchProductosTotalsForNegocioMock.mockResolvedValue({
+      data: {
+        lineCount: 1,
+        stockTotal: 3,
+        sumPrecioCompra: 10,
+        sumPrecioVenta: 20,
+      },
+      error: null,
+    });
+
+    render(<ProductosTab negocioId="n1" />);
+
+    const totalsRegion = await screen.findByRole("region", {
+      name: "Totales de productos",
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Agua" }));
+    const region = screen
+      .getAllByRole("region")
+      .find((r) => r.textContent?.includes("Código de barras"));
+    await user.click(within(region!).getByRole("button", { name: "Modificar" }));
+
+    const ventaInput = within(region!).getByDisplayValue("20");
+    await user.clear(ventaInput);
+    await user.type(ventaInput, "50");
+    await user.click(within(region!).getByRole("button", { name: "Listo" }));
+
+    expect(within(region!).queryByRole("button", { name: "Listo" })).not.toBeInTheDocument();
+    expect(totalsRegion).toHaveTextContent("$ 50,00");
+    expect(updateProductoMock).toHaveBeenCalled();
+
+    resolveUpdate({ data: { id: "p1" }, error: null });
+    await waitFor(() => {
+      expect(toastSuccess).toHaveBeenCalledWith("Producto guardado");
+    });
+  });
+
+  it("GAE-39: failed PATCH reverts row, totals, and re-enters edit", async () => {
+    const user = userEvent.setup();
+
+    listProductosPageMock.mockResolvedValue({
+      data: [
+        {
+          id: "p1",
+          negocio_id: "n1",
+          nombre: "Agua",
+          barcode: "1",
+          precio_compra: 10,
+          precio_venta: 20,
+          stock_actual: 3,
+          activo: true,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      error: null,
+    });
+    fetchProductosTotalsForNegocioMock.mockResolvedValue({
+      data: {
+        lineCount: 1,
+        stockTotal: 3,
+        sumPrecioCompra: 10,
+        sumPrecioVenta: 20,
+      },
+      error: null,
+    });
+    updateProductoMock.mockResolvedValue({
+      data: null,
+      error: { message: "falló red" },
+    });
+
+    render(<ProductosTab negocioId="n1" />);
+
+    const totalsRegion = await screen.findByRole("region", {
+      name: "Totales de productos",
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Agua" }));
+    const region = screen
+      .getAllByRole("region")
+      .find((r) => r.textContent?.includes("Código de barras"));
+    await user.click(within(region!).getByRole("button", { name: "Modificar" }));
+
+    const ventaInput = within(region!).getByDisplayValue("20");
+    await user.clear(ventaInput);
+    await user.type(ventaInput, "50");
+    await user.click(within(region!).getByRole("button", { name: "Listo" }));
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(within(region!).getByRole("button", { name: "Listo" })).toBeInTheDocument();
+    });
+    expect(totalsRegion).toHaveTextContent("$ 20,00");
+    expect(within(region!).getByDisplayValue("20")).toBeInTheDocument();
+  });
 });
 

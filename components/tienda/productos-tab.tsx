@@ -3,6 +3,11 @@
 import { createClient } from "@/lib/supabase/client";
 import { insertCompraReposicion } from "@/lib/queries/compras";
 import { recordProductoStockMovement } from "@/lib/queries/movimientos-stock";
+import {
+    applyProductoPatchDeltaToTotals,
+    cloneProductosTotals,
+    type ProductoEditablePatch,
+} from "@/lib/productos/optimistic-producto-patch";
 import { deleteProducto, fetchProductosTotalsForNegocio, insertProducto, listProductosPage, updateProducto } from "@/lib/queries/productos";
 import type { ProductoRow } from "@/lib/types/negocio";
 import type { ProductosTotals } from "@/lib/queries/productos";
@@ -133,19 +138,23 @@ function resetRowFormFromRow(
 function ProductoRowEditor({
     row,
     onChanged,
-    onSaved,
     isEditing,
     onStartEdit,
     onCancelEdit,
     onDoneEdit,
+    onOptimisticListo,
+    onOptimisticListoFailed,
+    onPersistSucceeded,
 }: {
     row: ProductoRow;
     onChanged: () => void;
-    onSaved: (patch: Pick<ProductoRow, "nombre" | "barcode" | "precio_compra" | "precio_venta" | "stock_actual" | "activo">) => void;
     isEditing: boolean;
     onStartEdit: () => void;
     onCancelEdit: () => void;
     onDoneEdit: () => void;
+    onOptimisticListo: (patch: ProductoEditablePatch) => void;
+    onOptimisticListoFailed: () => void;
+    onPersistSucceeded: () => void;
 }) {
     const [nombre, setNombre] = useState(row.nombre);
     const [barcode, setBarcode] = useState(row.barcode ?? "");
@@ -153,7 +162,6 @@ function ProductoRowEditor({
     const [precioVenta, setPrecioVenta] = useState(strMoney(row.precio_venta));
     const [stock, setStock] = useState(String(row.stock_actual));
     const [activo, setActivo] = useState(row.activo);
-    const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [msg, setMsg] = useState<string | null>(null);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -198,92 +206,100 @@ function ProductoRowEditor({
         onCancelEdit();
     }, [onCancelEdit, resetFormFromRow, row]);
 
-    const guardar = useCallback(
-        async (opts?: { notifySuccess?: boolean; listoButton?: boolean }) => {
-            if (!opts?.listoButton) return false;
+    const buildPatch = useCallback((): ProductoEditablePatch | null => {
+        const patch: ProductoEditablePatch = {
+            nombre: nombre.trim(),
+            barcode: barcode.trim() || null,
+            precio_compra: parseMoney(precioCompra),
+            precio_venta: parseMoney(precioVenta),
+            stock_actual: parseStock(stock),
+            activo,
+        };
+        if (!patch.nombre) return null;
+        return patch;
+    }, [activo, barcode, nombre, precioCompra, precioVenta, stock]);
 
-            const patch = {
-                nombre: nombre.trim(),
-                barcode: barcode.trim() || null,
-                precio_compra: parseMoney(precioCompra),
-                precio_venta: parseMoney(precioVenta),
-                stock_actual: parseStock(stock),
-                activo,
-            };
-
-            if (!patch.nombre) return false;
-
-            const key = JSON.stringify(patch);
-            if (key === lastSavedKeyRef.current) return true;
-            if (guardarInFlightRef.current) return false;
-
-            guardarInFlightRef.current = true;
-            setSaving(true);
+    const persistPatchToServer = useCallback(
+        async (patch: ProductoEditablePatch, prevStock: number): Promise<boolean> => {
             setMsg(null);
-            try {
-                const supabase = createClient();
-                const prevStock = row.stock_actual;
-                if (patch.stock_actual > prevStock) {
-                    const delta = patch.stock_actual - prevStock;
-                    const { error: compErr } = await insertCompraReposicion(
-                        supabase,
-                        row.negocio_id,
-                        [
-                            {
-                                producto_id: row.id,
-                                cantidad: delta,
-                                precio_unitario: patch.precio_compra,
-                            },
-                        ],
-                        { notas: "Compra (desde ficha producto)" },
-                    );
-                    if (compErr) {
-                        const desc = compErr instanceof Error ? compErr.message : String(compErr);
-                        setMsg(desc);
-                        toast.error("No se pudo registrar la compra de stock", { description: desc });
-                        return false;
-                    }
-                }
-
-                const { error } = await updateProducto(supabase, row.id, patch);
-                if (error) {
-                    setMsg(error.message);
-                    toast.error("No se pudo guardar el producto", {
-                        description: error.message,
-                    });
+            const supabase = createClient();
+            if (patch.stock_actual > prevStock) {
+                const delta = patch.stock_actual - prevStock;
+                const { error: compErr } = await insertCompraReposicion(
+                    supabase,
+                    row.negocio_id,
+                    [
+                        {
+                            producto_id: row.id,
+                            cantidad: delta,
+                            precio_unitario: patch.precio_compra,
+                        },
+                    ],
+                    { notas: "Compra (desde ficha producto)" },
+                );
+                if (compErr) {
+                    const desc = compErr instanceof Error ? compErr.message : String(compErr);
+                    setMsg(desc);
+                    toast.error("No se pudo registrar la compra de stock", { description: desc });
                     return false;
                 }
-                if (patch.stock_actual < prevStock) {
-                    const { error: movErr } = await recordProductoStockMovement(supabase, row.id, prevStock, patch.stock_actual, {
-                        precioCompra: patch.precio_compra,
-                        precioVenta: patch.precio_venta,
+            }
+
+            const { error } = await updateProducto(supabase, row.id, patch);
+            if (error) {
+                setMsg(error.message);
+                toast.error("No se pudo guardar el producto", {
+                    description: error.message,
+                });
+                return false;
+            }
+            if (patch.stock_actual < prevStock) {
+                const { error: movErr } = await recordProductoStockMovement(supabase, row.id, prevStock, patch.stock_actual, {
+                    precioCompra: patch.precio_compra,
+                    precioVenta: patch.precio_venta,
+                });
+                if (movErr) {
+                    toast.warning("Producto guardado, pero no se registró el movimiento de stock", {
+                        description: movErr.message,
                     });
-                    if (movErr) {
-                        toast.warning("Producto guardado, pero no se registró el movimiento de stock", {
-                            description: movErr.message,
-                        });
-                    }
                 }
-                lastSavedKeyRef.current = key;
-                if (opts?.notifySuccess) {
+            }
+            return true;
+        },
+        [row.id, row.negocio_id],
+    );
+
+    const confirmListo = useCallback(() => {
+        const patch = buildPatch();
+        if (!patch) return;
+
+        const key = JSON.stringify(patch);
+        if (key === lastSavedKeyRef.current) {
+            onDoneEdit();
+            return;
+        }
+        if (guardarInFlightRef.current) return;
+
+        const prevStock = row.stock_actual;
+        onOptimisticListo(patch);
+        onDoneEdit();
+
+        guardarInFlightRef.current = true;
+        void (async () => {
+            try {
+                const ok = await persistPatchToServer(patch, prevStock);
+                if (ok) {
+                    lastSavedKeyRef.current = key;
                     toast.success("Producto guardado");
-                    onSaved({
-                        nombre: patch.nombre,
-                        barcode: patch.barcode,
-                        precio_compra: patch.precio_compra,
-                        precio_venta: patch.precio_venta,
-                        stock_actual: patch.stock_actual,
-                        activo: patch.activo,
-                    });
+                    onPersistSucceeded();
+                } else {
+                    onOptimisticListoFailed();
                 }
-                return true;
             } finally {
                 guardarInFlightRef.current = false;
-                setSaving(false);
             }
-        },
-        [activo, barcode, nombre, onSaved, precioCompra, precioVenta, row.id, row.negocio_id, row.stock_actual, stock],
-    );
+        })();
+    }, [buildPatch, onDoneEdit, onOptimisticListo, onOptimisticListoFailed, onPersistSucceeded, persistPatchToServer, row.stock_actual]);
 
     const eliminar = async () => {
         setDeleting(true);
@@ -305,10 +321,6 @@ function ProductoRowEditor({
 
     const actions = (
         <>
-            {saving ?
-                <Loader2 className='h-4 w-4 animate-spin text-muted-foreground' aria-label='Guardando' />
-            :   null}
-
             <Button
                 type='button'
                 size='sm'
@@ -316,13 +328,12 @@ function ProductoRowEditor({
                 className='h-8 gap-1 px-2'
                 disabled={deleting}
                 tabIndex={isEditing ? -1 : 0}
-                onClick={async () => {
+                onClick={() => {
                     if (!isEditing) {
                         onStartEdit();
                         return;
                     }
-                    const ok = await guardar({ notifySuccess: true, listoButton: true });
-                    if (ok) onDoneEdit();
+                    confirmListo();
                 }}
                 aria-label={isEditing ? "Listo" : "Modificar"}>
                 {isEditing ?
@@ -337,7 +348,7 @@ function ProductoRowEditor({
                         size='sm'
                         variant='destructive'
                         className='h-8 gap-1 px-2'
-                        disabled={saving || deleting}
+                        disabled={deleting}
                         aria-label='Eliminar'>
                         {deleting ?
                             <Loader2 className='h-3 w-3 animate-spin shrink-0' />
@@ -644,16 +655,43 @@ export function ProductosTab({ negocioId }: Props) {
         }
     }, [debouncedSearch, negocioId]);
 
-    const handleProductoSaved = useCallback(
-        (
-            productoId: string,
-            patch: Pick<ProductoRow, "nombre" | "barcode" | "precio_compra" | "precio_venta" | "stock_actual" | "activo">,
-        ) => {
-            setRows((prev) => prev.map((r) => (r.id === productoId ? { ...r, ...patch } : r)));
-            void refreshTotals({ force: true });
+    type OptimisticListoSnapshot = { row: ProductoRow; totals: ProductosTotals | null };
+    const optimisticSnapshotsRef = useRef<Map<string, OptimisticListoSnapshot>>(new Map());
+
+    const applyOptimisticListo = useCallback(
+        (productId: string, patch: ProductoEditablePatch) => {
+            const prevRow = rows.find((r) => r.id === productId);
+            if (!prevRow) return;
+
+            optimisticSnapshotsRef.current.set(productId, {
+                row: { ...prevRow },
+                totals: totals ? cloneProductosTotals(totals) : null,
+            });
+
+            setRows((prev) => prev.map((r) => (r.id === productId ? { ...r, ...patch } : r)));
+            if (totals) {
+                setTotals(applyProductoPatchDeltaToTotals(totals, prevRow, patch));
+            }
         },
-        [refreshTotals],
+        [rows, totals],
     );
+
+    const revertOptimisticListo = useCallback((productId: string) => {
+        const snapshot = optimisticSnapshotsRef.current.get(productId);
+        if (!snapshot) return;
+        optimisticSnapshotsRef.current.delete(productId);
+
+        setRows((prev) => prev.map((r) => (r.id === productId ? snapshot.row : r)));
+        if (snapshot.totals) {
+            setTotals(snapshot.totals);
+        }
+        setTotalsWhileEditing(snapshot.totals);
+        setEditingRowId(productId);
+    }, []);
+
+    const clearOptimisticListoSnapshot = useCallback((productId: string) => {
+        optimisticSnapshotsRef.current.delete(productId);
+    }, []);
 
     const beginEditRow = useCallback(
         (rowId: string) => {
@@ -959,11 +997,16 @@ export function ProductosTab({ negocioId }: Props) {
                                         key={row.id}
                                         row={row}
                                         onChanged={loadFirstPage}
-                                        onSaved={(patch) => handleProductoSaved(row.id, patch)}
                                         isEditing={editingRowId === row.id}
                                         onStartEdit={() => beginEditRow(row.id)}
                                         onCancelEdit={cancelEditRow}
                                         onDoneEdit={finishEditRow}
+                                        onOptimisticListo={(patch) => applyOptimisticListo(row.id, patch)}
+                                        onOptimisticListoFailed={() => revertOptimisticListo(row.id)}
+                                        onPersistSucceeded={() => {
+                                            clearOptimisticListoSnapshot(row.id);
+                                            void refreshTotals({ force: true });
+                                        }}
                                     />
                                 ))
                             }
