@@ -5,6 +5,7 @@ import { listProductos } from "@/lib/queries/productos";
 import type { ProductoRow } from "@/lib/types/negocio";
 import { BarcodeScannerDialog } from "@/components/tienda/barcode-scanner-dialog";
 import { MercadoPagoOAuthStatusBanner } from "@/components/tienda/mercadopago-oauth-status-banner";
+import { DescargarComprobantePagoButton } from "@/components/mercadopago/descargar-comprobante-pago-button";
 import { CobrarMpQrPanel } from "@/components/tienda/cobrar-mp-qr-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ export function CobrarTab({ negocioId }: Props) {
     const [configuracionHref, setConfiguracionHref] = useState("/tiendas?tab=configuracion");
     /** null = aún no consultado; solo true habilita el método QR. */
     const [mpConnectedForQr, setMpConnectedForQr] = useState<boolean | null>(null);
+    const [lastMpVentaId, setLastMpVentaId] = useState<string | null>(null);
 
     const handleMpConnectionChange = useCallback((connected: boolean) => {
         setMpConnectedForQr(connected);
@@ -140,13 +142,17 @@ export function CobrarTab({ negocioId }: Props) {
         [cart],
     );
 
-    const handleQrPaymentApproved = useCallback(() => {
-        toast.success("Pago aprobado", { description: "Venta registrada." });
-        setCart([]);
-        setPaymentMethod(null);
-        setQuery("");
-        load();
-    }, [load]);
+    const handleQrPaymentApproved = useCallback(
+        (ventaId: string) => {
+            toast.success("Pago aprobado", { description: "Venta registrada." });
+            setLastMpVentaId(ventaId);
+            setCart([]);
+            setPaymentMethod(null);
+            setQuery("");
+            load();
+        },
+        [load],
+    );
 
     const validarEfectivo = useCallback(async () => {
         if (cart.length === 0) {
@@ -353,6 +359,13 @@ export function CobrarTab({ negocioId }: Props) {
                     <span className='text-sm font-semibold tabular-nums'>{moneyARS(subtotal)}</span>
                 </div>
             </section>
+
+            {lastMpVentaId ?
+                <div className='flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3'>
+                    <p className='text-sm text-muted-foreground'>Último cobro con Mercado Pago</p>
+                    <DescargarComprobantePagoButton ventaId={lastMpVentaId} />
+                </div>
+            :   null}
 
             <section className='rounded-lg border bg-card p-4 flex flex-col gap-3'>
                 <h3 className='text-sm font-medium'>Método de pago</h3>

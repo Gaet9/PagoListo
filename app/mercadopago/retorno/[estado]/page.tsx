@@ -53,9 +53,9 @@ async function MercadoPagoRetornoContent({ params, searchParams }: PageProps) {
               <ComprobantePagoPdfButton searchParams={sp} />
             </div>
           ) : null}
-          {entries.length > 0 ? (
+          {estado !== "exito" && entries.length > 0 ? (
             <dl className="mt-8 rounded-lg border border-border bg-muted/30 p-4 text-sm">
-              <dt className="font-medium text-foreground">Parámetros en la URL (Mercado Pago)</dt>
+              <dt className="font-medium text-foreground">Detalle del retorno</dt>
               <dd className="mt-2 space-y-1 font-mono text-xs text-muted-foreground">
                 {entries.map(([key, value]) => (
                   <div key={key}>

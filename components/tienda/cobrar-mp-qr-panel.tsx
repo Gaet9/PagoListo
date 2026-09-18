@@ -25,7 +25,7 @@ type Props = {
     lines: CobrarMpQrCartLine[];
     oauthReturnPath: string;
     onMpConnectionChange: (connected: boolean) => void;
-    onPaymentApproved: () => void;
+    onPaymentApproved: (ventaId: string) => void;
 };
 
 type CheckoutPhase = "empty" | "loading" | "error" | "ready";
@@ -49,12 +49,15 @@ export function CobrarMpQrPanel({
 
     const approvedHandledRef = useRef(false);
 
-    const markApproved = useCallback(() => {
-        if (approvedHandledRef.current) return;
-        approvedHandledRef.current = true;
-        setAwaitingPayment(false);
-        onPaymentApproved();
-    }, [onPaymentApproved]);
+    const markApproved = useCallback(
+        (ventaId: string) => {
+            if (approvedHandledRef.current) return;
+            approvedHandledRef.current = true;
+            setAwaitingPayment(false);
+            onPaymentApproved(ventaId);
+        },
+        [onPaymentApproved],
+    );
 
     useEffect(() => {
         approvedHandledRef.current = false;
@@ -143,7 +146,7 @@ export function CobrarMpQrPanel({
                 (payload) => {
                     const ventaId = (payload.new as Record<string, unknown> | null)?.["venta_id"];
                     if (typeof ventaId !== "string" || !ventaId) return;
-                    markApproved();
+                    markApproved(ventaId);
                 },
             )
             .subscribe();
@@ -161,8 +164,8 @@ export function CobrarMpQrPanel({
         const poll = async () => {
             const result = await fetchCobroIntentoStatus(intentoId);
             if (cancelled || !result.ok) return;
-            if (result.status.approved) {
-                markApproved();
+            if (result.status.approved && result.status.venta_id) {
+                markApproved(result.status.venta_id);
             }
         };
 
@@ -185,8 +188,8 @@ export function CobrarMpQrPanel({
             setAwaitingPayment(false);
             return;
         }
-        if (result.status.approved) {
-            markApproved();
+        if (result.status.approved && result.status.venta_id) {
+            markApproved(result.status.venta_id);
             return;
         }
         setAwaitingPayment(true);
