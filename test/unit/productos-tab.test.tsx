@@ -245,6 +245,56 @@ describe("ProductosTab", () => {
     });
   });
 
+  it("does not save on Enter or Tab between fields", async () => {
+    const user = userEvent.setup();
+
+    listProductosPageMock.mockResolvedValue({
+      data: [
+        {
+          id: "p1",
+          negocio_id: "n1",
+          nombre: "Agua",
+          barcode: "1",
+          precio_compra: 10,
+          precio_venta: 20,
+          stock_actual: 3,
+          activo: true,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      error: null,
+    });
+    fetchProductosTotalsForNegocioMock.mockResolvedValue({
+      data: {
+        lineCount: 1,
+        stockTotal: 3,
+        sumPrecioCompra: 10,
+        sumPrecioVenta: 20,
+      },
+      error: null,
+    });
+
+    render(<ProductosTab negocioId="n1" />);
+
+    await screen.findByRole("region", { name: "Totales de productos" });
+
+    await user.click(await screen.findByRole("button", { name: "Agua" }));
+    const region = screen
+      .getAllByRole("region")
+      .find((r) => r.textContent?.includes("Código de barras"));
+    await user.click(within(region!).getByRole("button", { name: "Modificar" }));
+
+    const ventaInput = within(region!).getByDisplayValue("20");
+    await user.clear(ventaInput);
+    await user.type(ventaInput, "55");
+    await user.keyboard("{Enter}");
+    expect(updateProductoMock).not.toHaveBeenCalled();
+
+    await user.tab();
+    await user.tab();
+    expect(updateProductoMock).not.toHaveBeenCalled();
+  });
+
   it("Escape cancels price edit without saving or refreshing totals", async () => {
     const user = userEvent.setup();
 

@@ -92,6 +92,23 @@ function formatARS(n: number) {
     }).format(n);
 }
 
+/** Evita que Enter/Escape en campos disparen guardado o cierre de acordeones Radix. */
+function handleProductEditFieldKeyDown(
+    e: React.KeyboardEvent,
+    onEscape: () => void,
+) {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+    }
+    if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onEscape();
+    }
+}
+
 function resetRowFormFromRow(
     row: ProductoRow,
     setters: {
@@ -119,6 +136,7 @@ function ProductoRowEditor({
     onSaved,
     isEditing,
     onStartEdit,
+    onCancelEdit,
     onDoneEdit,
 }: {
     row: ProductoRow;
@@ -126,6 +144,7 @@ function ProductoRowEditor({
     onSaved: (patch: Pick<ProductoRow, "nombre" | "barcode" | "precio_compra" | "precio_venta" | "stock_actual" | "activo">) => void;
     isEditing: boolean;
     onStartEdit: () => void;
+    onCancelEdit: () => void;
     onDoneEdit: () => void;
 }) {
     const [nombre, setNombre] = useState(row.nombre);
@@ -140,27 +159,49 @@ function ProductoRowEditor({
     const [deleteOpen, setDeleteOpen] = useState(false);
     const lastSavedKeyRef = useRef<string>("");
     const guardarInFlightRef = useRef(false);
+    const editBaselineRef = useRef<ProductoRow | null>(null);
+    const wasEditingRef = useRef(false);
 
-    const resetFormFromRow = useCallback(() => {
-        resetRowFormFromRow(row, {
-            setNombre,
-            setBarcode,
-            setPrecioCompra,
-            setPrecioVenta,
-            setStock,
-            setActivo,
-            setMsg,
-        });
-        lastSavedKeyRef.current = "";
-    }, [row]);
+    const resetFormFromRow = useCallback(
+        (source: ProductoRow) => {
+            resetRowFormFromRow(source, {
+                setNombre,
+                setBarcode,
+                setPrecioCompra,
+                setPrecioVenta,
+                setStock,
+                setActivo,
+                setMsg,
+            });
+            lastSavedKeyRef.current = "";
+        },
+        [],
+    );
 
     useEffect(() => {
-        if (isEditing) return;
-        resetFormFromRow();
-    }, [isEditing, resetFormFromRow]);
+        if (!isEditing) {
+            editBaselineRef.current = null;
+            wasEditingRef.current = false;
+            resetFormFromRow(row);
+            return;
+        }
+        if (!wasEditingRef.current) {
+            editBaselineRef.current = { ...row };
+            resetFormFromRow(row);
+            wasEditingRef.current = true;
+        }
+    }, [isEditing, resetFormFromRow, row]);
+
+    const cancelEditing = useCallback(() => {
+        const baseline = editBaselineRef.current ?? row;
+        resetFormFromRow(baseline);
+        onCancelEdit();
+    }, [onCancelEdit, resetFormFromRow, row]);
 
     const guardar = useCallback(
-        async (opts?: { notifySuccess?: boolean }) => {
+        async (opts?: { notifySuccess?: boolean; listoButton?: boolean }) => {
+            if (!opts?.listoButton) return false;
+
             const patch = {
                 nombre: nombre.trim(),
                 barcode: barcode.trim() || null,
@@ -244,17 +285,6 @@ function ProductoRowEditor({
         [activo, barcode, nombre, onSaved, precioCompra, precioVenta, row.id, row.negocio_id, row.stock_actual, stock],
     );
 
-    useEffect(() => {
-        if (!isEditing) return;
-        const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key !== "Escape") return;
-            resetFormFromRow();
-            onDoneEdit();
-        };
-        window.addEventListener("keydown", onKeyDown);
-        return () => window.removeEventListener("keydown", onKeyDown);
-    }, [isEditing, onDoneEdit, resetFormFromRow]);
-
     const eliminar = async () => {
         setDeleting(true);
         setMsg(null);
@@ -290,7 +320,7 @@ function ProductoRowEditor({
                         onStartEdit();
                         return;
                     }
-                    const ok = await guardar({ notifySuccess: true });
+                    const ok = await guardar({ notifySuccess: true, listoButton: true });
                     if (ok) onDoneEdit();
                 }}
                 aria-label={isEditing ? "Listo" : "Modificar"}>
@@ -353,6 +383,7 @@ function ProductoRowEditor({
                                             <Input
                                                 value={barcode}
                                                 onChange={(e) => setBarcode(e.target.value)}
+                                                onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
                                                 className='h-9 text-sm'
                                             />
                                         :   <p className='text-sm'>{barcode || "-"}</p>}
@@ -365,6 +396,7 @@ function ProductoRowEditor({
                                                 <Input
                                                     value={precioCompra}
                                                     onChange={(e) => setPrecioCompra(sanitizeDecimalInput(e.target.value))}
+                                                    onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
                                                     className='h-9 text-sm'
                                                     inputMode='decimal'
                                                     pattern='[0-9.,]*'
@@ -377,6 +409,7 @@ function ProductoRowEditor({
                                                 <Input
                                                     value={precioVenta}
                                                     onChange={(e) => setPrecioVenta(sanitizeDecimalInput(e.target.value))}
+                                                    onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
                                                     className='h-9 text-sm'
                                                     inputMode='decimal'
                                                     pattern='[0-9.,]*'
@@ -389,6 +422,7 @@ function ProductoRowEditor({
                                                 <Input
                                                     value={stock}
                                                     onChange={(e) => setStock(sanitizeIntInput(e.target.value))}
+                                                    onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
                                                     className='h-9 text-sm'
                                                     inputMode='numeric'
                                                     pattern='[0-9]*'
@@ -429,50 +463,60 @@ function ProductoRowEditor({
             {/* Desktop: single line per product */}
             <tr className='hidden sm:table-row border-b align-middle'>
                 <td className='p-2'>
-                    <Input
-                        value={nombre}
-                        onChange={(e) => setNombre(e.target.value)}
-                        className='h-8 text-sm'
-                        readOnly={!isEditing}
-                    />
+                    {isEditing ?
+                        <Input
+                            value={nombre}
+                            onChange={(e) => setNombre(e.target.value)}
+                            onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                            className='h-8 text-sm'
+                        />
+                    :   <span className='text-sm truncate block'>{nombre}</span>}
                 </td>
                 <td className='p-2'>
-                    <Input
-                        value={barcode}
-                        onChange={(e) => setBarcode(e.target.value)}
-                        className='h-8 text-sm'
-                        readOnly={!isEditing}
-                    />
+                    {isEditing ?
+                        <Input
+                            value={barcode}
+                            onChange={(e) => setBarcode(e.target.value)}
+                            onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                            className='h-8 text-sm'
+                        />
+                    :   <span className='text-sm truncate block'>{barcode || "-"}</span>}
                 </td>
                 <td className='p-2'>
-                    <Input
-                        value={precioCompra}
-                        onChange={(e) => setPrecioCompra(sanitizeDecimalInput(e.target.value))}
-                        className='h-8 text-sm'
-                        inputMode='decimal'
-                        readOnly={!isEditing}
-                        pattern='[0-9.,]*'
-                    />
+                    {isEditing ?
+                        <Input
+                            value={precioCompra}
+                            onChange={(e) => setPrecioCompra(sanitizeDecimalInput(e.target.value))}
+                            onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                            className='h-8 text-sm'
+                            inputMode='decimal'
+                            pattern='[0-9.,]*'
+                        />
+                    :   <span className='text-sm tabular-nums'>{precioCompra || "-"}</span>}
                 </td>
                 <td className='p-2'>
-                    <Input
-                        value={precioVenta}
-                        onChange={(e) => setPrecioVenta(sanitizeDecimalInput(e.target.value))}
-                        className='h-8 text-sm'
-                        inputMode='decimal'
-                        readOnly={!isEditing}
-                        pattern='[0-9.,]*'
-                    />
+                    {isEditing ?
+                        <Input
+                            value={precioVenta}
+                            onChange={(e) => setPrecioVenta(sanitizeDecimalInput(e.target.value))}
+                            onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                            className='h-8 text-sm'
+                            inputMode='decimal'
+                            pattern='[0-9.,]*'
+                        />
+                    :   <span className='text-sm tabular-nums'>{precioVenta || "-"}</span>}
                 </td>
                 <td className='p-2'>
-                    <Input
-                        value={stock}
-                        onChange={(e) => setStock(sanitizeIntInput(e.target.value))}
-                        className='h-8 text-sm'
-                        inputMode='numeric'
-                        readOnly={!isEditing}
-                        pattern='[0-9]*'
-                    />
+                    {isEditing ?
+                        <Input
+                            value={stock}
+                            onChange={(e) => setStock(sanitizeIntInput(e.target.value))}
+                            onKeyDown={(e) => handleProductEditFieldKeyDown(e, cancelEditing)}
+                            className='h-8 text-sm'
+                            inputMode='numeric'
+                            pattern='[0-9]*'
+                        />
+                    :   <span className='text-sm tabular-nums'>{stock || "0"}</span>}
                 </td>
                 <td className='p-2'>
                     <div className='flex items-center gap-2 pt-1'>
@@ -517,6 +561,9 @@ export function ProductosTab({ negocioId }: Props) {
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
     const [editingRowId, setEditingRowId] = useState<string | null>(null);
+    const [totalsWhileEditing, setTotalsWhileEditing] = useState<ProductosTotals | null>(null);
+    const editingRowIdRef = useRef<string | null>(null);
+    editingRowIdRef.current = editingRowId;
     const [addAccordionValue, setAddAccordionValue] = useState<string>("");
     const [nNombre, setNNombre] = useState("");
     const [nBarcode, setNBarcode] = useState("");
@@ -558,12 +605,14 @@ export function ProductosTab({ negocioId }: Props) {
             return;
         }
 
-        if (totalsRes.error) {
-            setTotals(null);
-            setTotalsError(totalsRes.error.message);
-        } else {
-            setTotals(totalsRes.data);
-            setTotalsError(null);
+        if (editingRowIdRef.current === null) {
+            if (totalsRes.error) {
+                setTotals(null);
+                setTotalsError(totalsRes.error.message);
+            } else {
+                setTotals(totalsRes.data);
+                setTotalsError(null);
+            }
         }
 
         const list = (data as ProductoRow[]) ?? [];
@@ -579,7 +628,9 @@ export function ProductosTab({ negocioId }: Props) {
         }
     }, [debouncedSearch, negocioId]);
 
-    const refreshTotals = useCallback(async () => {
+    const refreshTotals = useCallback(async (opts?: { force?: boolean }) => {
+        if (editingRowIdRef.current !== null && !opts?.force) return;
+
         const supabase = createClient();
         const search = debouncedSearch || undefined;
         const totalsRes = await fetchProductosTotalsForNegocio(supabase, negocioId, { search });
@@ -598,10 +649,30 @@ export function ProductosTab({ negocioId }: Props) {
             patch: Pick<ProductoRow, "nombre" | "barcode" | "precio_compra" | "precio_venta" | "stock_actual" | "activo">,
         ) => {
             setRows((prev) => prev.map((r) => (r.id === productoId ? { ...r, ...patch } : r)));
-            void refreshTotals();
+            void refreshTotals({ force: true });
         },
         [refreshTotals],
     );
+
+    const beginEditRow = useCallback(
+        (rowId: string) => {
+            setTotalsWhileEditing(totals);
+            setEditingRowId(rowId);
+        },
+        [totals],
+    );
+
+    const cancelEditRow = useCallback(() => {
+        setEditingRowId(null);
+        setTotalsWhileEditing(null);
+    }, []);
+
+    const finishEditRow = useCallback(() => {
+        setEditingRowId(null);
+        setTotalsWhileEditing(null);
+    }, []);
+
+    const displayTotals = totalsWhileEditing ?? totals;
 
     const loadMore = useCallback(async () => {
         if (!hasMore || loadingMore || !nextCursor) return;
@@ -889,8 +960,9 @@ export function ProductosTab({ negocioId }: Props) {
                                         onChanged={loadFirstPage}
                                         onSaved={(patch) => handleProductoSaved(row.id, patch)}
                                         isEditing={editingRowId === row.id}
-                                        onStartEdit={() => setEditingRowId(row.id)}
-                                        onDoneEdit={() => setEditingRowId(null)}
+                                        onStartEdit={() => beginEditRow(row.id)}
+                                        onCancelEdit={cancelEditRow}
+                                        onDoneEdit={finishEditRow}
                                     />
                                 ))
                             }
@@ -901,7 +973,7 @@ export function ProductosTab({ negocioId }: Props) {
                 <div role='region' aria-label='Totales de productos' className='shrink-0 border-t bg-muted/50'>
                     {totalsError ?
                         <p className='px-3 py-2 text-xs text-destructive'>{totalsError}</p>
-                    : totals ?
+                    : displayTotals ?
                         <div className='px-3 py-2.5'>
                             <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4'>
                                 <div className='flex items-center gap-2 min-w-0'>
@@ -911,7 +983,7 @@ export function ProductosTab({ negocioId }: Props) {
                                             <span className='ml-1 font-normal normal-case'>(según búsqueda)</span>
                                         :   null}
                                     </p>
-                                    {loadingInitial && rows.length > 0 ?
+                                    {loadingInitial && rows.length > 0 && editingRowId === null ?
                                         <Loader2
                                             className='h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0'
                                             aria-label='Actualizando totales'
@@ -921,22 +993,22 @@ export function ProductosTab({ negocioId }: Props) {
                                 <dl className='flex min-w-0 w-full flex-nowrap items-baseline gap-x-4 gap-y-0 overflow-x-auto text-xs tabular-nums sm:flex-wrap sm:gap-x-6 sm:gap-y-1'>
                                     <div className='shrink-0'>
                                         <dt className='text-muted-foreground'>Productos</dt>
-                                        <dd className='font-medium text-foreground'>{totals.lineCount}</dd>
+                                        <dd className='font-medium text-foreground'>{displayTotals.lineCount}</dd>
                                     </div>
                                     <div className='shrink-0'>
                                         <dt className='text-muted-foreground'>Stock</dt>
-                                        <dd className='font-medium text-foreground'>{totals.stockTotal}</dd>
+                                        <dd className='font-medium text-foreground'>{displayTotals.stockTotal}</dd>
                                     </div>
                                     <div className='shrink-0'>
                                         <dt className='text-muted-foreground'>Total compra</dt>
                                         <dd className='font-medium text-foreground whitespace-nowrap'>
-                                            {formatARS(totals.sumPrecioCompra)}
+                                            {formatARS(displayTotals.sumPrecioCompra)}
                                         </dd>
                                     </div>
                                     <div className='shrink-0'>
                                         <dt className='text-muted-foreground'>Total venta</dt>
                                         <dd className='font-medium text-foreground whitespace-nowrap'>
-                                            {formatARS(totals.sumPrecioVenta)}
+                                            {formatARS(displayTotals.sumPrecioVenta)}
                                         </dd>
                                     </div>
                                 </dl>
