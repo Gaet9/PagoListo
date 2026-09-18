@@ -315,6 +315,7 @@ function ProductoRowEditor({
                 variant='secondary'
                 className='h-8 gap-1 px-2'
                 disabled={deleting}
+                tabIndex={isEditing ? -1 : 0}
                 onClick={async () => {
                     if (!isEditing) {
                         onStartEdit();
