@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { COBRO_API_ERROR_MESSAGES } from "@/lib/mercadopago/cobro-api-errors";
 import { mercadoPagoCobroPreferenceErrorMessage } from "@/lib/mercadopago/cobro-preference-api-error";
 import { resolveCobroPreferenceLines, type CobroLineRequest } from "@/lib/mercadopago/cobro-preference-lines";
 import { getMercadoPagoClientForAccessToken } from "@/lib/mercadopago/client";
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
   try {
     json = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: COBRO_API_ERROR_MESSAGES.invalidJson }, { status: 400 });
   }
 
   const body = parseBody(json);
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: COBRO_API_ERROR_MESSAGES.unauthorized }, { status: 401 });
   }
 
   const { data: negocio, error: negocioErr } = await supabase.from("negocios").select("id").eq("id", negocioId).single();
