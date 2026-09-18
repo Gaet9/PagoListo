@@ -5,13 +5,11 @@ import { listProductos } from "@/lib/queries/productos";
 import type { ProductoRow } from "@/lib/types/negocio";
 import { BarcodeScannerDialog } from "@/components/tienda/barcode-scanner-dialog";
 import { MercadoPagoOAuthStatusBanner } from "@/components/tienda/mercadopago-oauth-status-banner";
-import { MercadoPagoQr } from "@/components/tienda/mercadopago-qr";
-import { buildMercadoPagoOAuthStartPath } from "@/lib/mercadopago/oauth-start-url";
-import { fetchMercadoPagoOAuthStatus } from "@/lib/mercadopago/fetch-oauth-status-client";
+import { CobrarMpQrPanel } from "@/components/tienda/cobrar-mp-qr-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Camera, Loader2, Minus, Plus, Trash2 } from "lucide-react";
+import { Camera, Minus, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Props = { negocioId: string };
@@ -44,11 +42,6 @@ export function CobrarTab({ negocioId }: Props) {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [paymentMethod, setPaymentMethod] = useState<"cash" | "qr" | "transfer" | null>(null);
     const [validating, setValidating] = useState(false);
-    const [qrConnected, setQrConnected] = useState<boolean | null>(null);
-    const [qrLoading, setQrLoading] = useState(false);
-    const [qrError, setQrError] = useState<string | null>(null);
-    const [qrInitPoint, setQrInitPoint] = useState<string | null>(null);
-    const [qrIntentoId, setQrIntentoId] = useState<string | null>(null);
     const [oauthReturnPath, setOauthReturnPath] = useState("/tiendas?tab=cobrar");
     const [configuracionHref, setConfiguracionHref] = useState("/tiendas?tab=configuracion");
     /** null = aún no consultado; solo true habilita el método QR. */
@@ -136,141 +129,24 @@ export function CobrarTab({ negocioId }: Props) {
 
     const cartFingerprint = useMemo(() => cart.map((it) => `${it.producto.id}:${it.qty}`).join("|"), [cart]);
 
-    const resetQrAfterApproved = useCallback(() => {
+    const qrCartLines = useMemo(
+        () =>
+            cart.map((it) => ({
+                productoId: it.producto.id,
+                title: it.producto.nombre,
+                qty: it.qty,
+                unitPrice: toNumber(it.producto.precio_venta),
+            })),
+        [cart],
+    );
+
+    const handleQrPaymentApproved = useCallback(() => {
         toast.success("Pago aprobado", { description: "Venta registrada." });
         setCart([]);
         setPaymentMethod(null);
         setQuery("");
-        setQrConnected(null);
-        setQrLoading(false);
-        setQrError(null);
-        setQrInitPoint(null);
-        setQrIntentoId(null);
         load();
     }, [load]);
-
-    useEffect(() => {
-        if (paymentMethod !== "qr") {
-            setQrConnected(null);
-            setQrLoading(false);
-            setQrError(null);
-            setQrInitPoint(null);
-            setQrIntentoId(null);
-            return;
-        }
-        let cancelled = false;
-        setQrLoading(true);
-        setQrError(null);
-        setQrInitPoint(null);
-
-        (async () => {
-            try {
-                const statusResult = await fetchMercadoPagoOAuthStatus(negocioId);
-                if (!statusResult.ok) {
-                    throw new Error(statusResult.message);
-                }
-
-                const connected = statusResult.status.connected;
-                if (!cancelled) setQrConnected(connected);
-                if (!cancelled) setMpConnectedForQr(connected);
-
-                if (!connected || cart.length === 0) return;
-
-                const res = await fetch("/api/mercadopago/preference", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "same-origin",
-                    body: JSON.stringify({
-                        negocioId,
-                        items: cart.map((it) => ({
-                            id: it.producto.id,
-                            quantity: it.qty,
-                        })),
-                    }),
-                });
-                const data = (await res.json().catch(() => ({}))) as {
-                    init_point?: string;
-                    sandbox_init_point?: string;
-                    intento_id?: string;
-                    error?: string;
-                };
-                if (!res.ok) {
-                    if (res.status === 409) {
-                        setMpConnectedForQr(false);
-                    }
-                    throw new Error(data.error || `Error ${res.status}`);
-                }
-                const initPoint = data.init_point || data.sandbox_init_point;
-                if (!initPoint) {
-                    throw new Error("La API no devolvió el link de pago (init_point).");
-                }
-                if (!cancelled) setQrInitPoint(initPoint);
-                if (!cancelled) setQrIntentoId(typeof data.intento_id === "string" ? data.intento_id : null);
-            } catch (e) {
-                if (!cancelled) setQrError(e instanceof Error ? e.message : "No se pudo preparar el QR.");
-            } finally {
-                if (!cancelled) setQrLoading(false);
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [paymentMethod, cartFingerprint, negocioId, cart]);
-
-    useEffect(() => {
-        if (paymentMethod !== "qr" || !qrIntentoId) return;
-        const supabase = createClient();
-        const channel = supabase
-            .channel(`mp_cobro_intentos:${qrIntentoId}`)
-            .on(
-                "postgres_changes",
-                {
-                    event: "UPDATE",
-                    schema: "public",
-                    table: "mp_cobro_intentos",
-                    filter: `id=eq.${qrIntentoId}`,
-                },
-                (payload) => {
-                    const ventaId = (payload.new as Record<string, unknown> | null)?.["venta_id"];
-                    if (typeof ventaId !== "string" || !ventaId) return;
-                    resetQrAfterApproved();
-                },
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [paymentMethod, qrIntentoId, resetQrAfterApproved]);
-
-    useEffect(() => {
-        if (paymentMethod !== "qr" || !qrIntentoId) return;
-
-        let cancelled = false;
-        const poll = async () => {
-            try {
-                const res = await fetch(
-                    `/api/mercadopago/cobro-intento/status?intentoId=${encodeURIComponent(qrIntentoId)}`,
-                    { method: "GET", credentials: "same-origin" },
-                );
-                const data = (await res.json().catch(() => ({}))) as { approved?: boolean };
-                if (!cancelled && res.ok && data.approved) {
-                    resetQrAfterApproved();
-                }
-            } catch {
-                // ignore transient poll errors
-            }
-        };
-
-        const interval = window.setInterval(poll, 4000);
-        poll();
-
-        return () => {
-            cancelled = true;
-            window.clearInterval(interval);
-        };
-    }, [paymentMethod, qrIntentoId, resetQrAfterApproved]);
 
     const validarEfectivo = useCallback(async () => {
         if (cart.length === 0) {
@@ -512,43 +388,14 @@ export function CobrarTab({ negocioId }: Props) {
                 :   null}
 
                 {paymentMethod === "qr" ?
-                    <div className='pt-2 flex flex-col gap-3 border-t border-border/60 mt-1'>
-                        <p className='text-xs text-muted-foreground'>Escanear el QR desde la app de Mercado Pago.</p>
-
-                        {cart.length === 0 ?
-                            <p className='text-sm text-muted-foreground'>Agregá productos al carrito para generar un QR de cobro.</p>
-                        : qrError ?
-                            <p className='text-sm text-destructive'>{qrError}</p>
-                        : qrLoading ?
-                            <div className='flex items-center gap-2 text-sm text-muted-foreground'>
-                                <Loader2 className='h-4 w-4 animate-spin shrink-0' aria-hidden />
-                                Preparando QR…
-                            </div>
-                        : qrConnected === false ?
-                            <div className='flex justify-end'>
-                                <Button
-                                    type='button'
-                                    className='shrink-0'
-                                    onClick={() => {
-                                        const params = new URLSearchParams(window.location.search);
-                                        params.set("tab", "cobrar");
-                                        const redirectTo = `${window.location.pathname}?${params.toString()}`;
-                                        window.location.href = buildMercadoPagoOAuthStartPath(negocioId, redirectTo);
-                                    }}>
-                                    Vincular
-                                </Button>
-                            </div>
-                        : qrInitPoint ?
-                            <div className='flex flex-col items-center gap-3'>
-                                <MercadoPagoQr value={qrInitPoint} />
-                                <Button type='button' variant='secondary' asChild>
-                                    <a href={qrInitPoint} target='_blank' rel='noreferrer'>
-                                        Abrir link de pago
-                                    </a>
-                                </Button>
-                            </div>
-                        :   <p className='text-sm text-muted-foreground'>Listo para generar el QR.</p>}
-                    </div>
+                    <CobrarMpQrPanel
+                        negocioId={negocioId}
+                        cartFingerprint={cartFingerprint}
+                        lines={qrCartLines}
+                        oauthReturnPath={oauthReturnPath}
+                        onMpConnectionChange={handleMpConnectionChange}
+                        onPaymentApproved={handleQrPaymentApproved}
+                    />
                 :   null}
             </section>
         </div>
