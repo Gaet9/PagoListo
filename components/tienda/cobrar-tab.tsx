@@ -136,6 +136,19 @@ export function CobrarTab({ negocioId }: Props) {
 
     const cartFingerprint = useMemo(() => cart.map((it) => `${it.producto.id}:${it.qty}`).join("|"), [cart]);
 
+    const resetQrAfterApproved = useCallback(() => {
+        toast.success("Pago aprobado", { description: "Venta registrada." });
+        setCart([]);
+        setPaymentMethod(null);
+        setQuery("");
+        setQrConnected(null);
+        setQrLoading(false);
+        setQrError(null);
+        setQrInitPoint(null);
+        setQrIntentoId(null);
+        load();
+    }, [load]);
+
     useEffect(() => {
         if (paymentMethod !== "qr") {
             setQrConnected(null);
@@ -171,10 +184,7 @@ export function CobrarTab({ negocioId }: Props) {
                         negocioId,
                         items: cart.map((it) => ({
                             id: it.producto.id,
-                            title: it.producto.nombre,
                             quantity: it.qty,
-                            unit_price: toNumber(it.producto.precio_venta),
-                            currency_id: "ARS",
                         })),
                     }),
                 });
@@ -185,6 +195,9 @@ export function CobrarTab({ negocioId }: Props) {
                     error?: string;
                 };
                 if (!res.ok) {
+                    if (res.status === 409) {
+                        setMpConnectedForQr(false);
+                    }
                     throw new Error(data.error || `Error ${res.status}`);
                 }
                 const initPoint = data.init_point || data.sandbox_init_point;
@@ -221,17 +234,7 @@ export function CobrarTab({ negocioId }: Props) {
                 (payload) => {
                     const ventaId = (payload.new as Record<string, unknown> | null)?.["venta_id"];
                     if (typeof ventaId !== "string" || !ventaId) return;
-
-                    toast.success("Pago aprobado", { description: "Venta registrada." });
-                    setCart([]);
-                    setPaymentMethod(null);
-                    setQuery("");
-                    setQrConnected(null);
-                    setQrLoading(false);
-                    setQrError(null);
-                    setQrInitPoint(null);
-                    setQrIntentoId(null);
-                    load();
+                    resetQrAfterApproved();
                 },
             )
             .subscribe();
@@ -239,7 +242,35 @@ export function CobrarTab({ negocioId }: Props) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [paymentMethod, qrIntentoId, load]);
+    }, [paymentMethod, qrIntentoId, resetQrAfterApproved]);
+
+    useEffect(() => {
+        if (paymentMethod !== "qr" || !qrIntentoId) return;
+
+        let cancelled = false;
+        const poll = async () => {
+            try {
+                const res = await fetch(
+                    `/api/mercadopago/cobro-intento/status?intentoId=${encodeURIComponent(qrIntentoId)}`,
+                    { method: "GET", credentials: "same-origin" },
+                );
+                const data = (await res.json().catch(() => ({}))) as { approved?: boolean };
+                if (!cancelled && res.ok && data.approved) {
+                    resetQrAfterApproved();
+                }
+            } catch {
+                // ignore transient poll errors
+            }
+        };
+
+        const interval = window.setInterval(poll, 4000);
+        poll();
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(interval);
+        };
+    }, [paymentMethod, qrIntentoId, resetQrAfterApproved]);
 
     const validarEfectivo = useCallback(async () => {
         if (cart.length === 0) {

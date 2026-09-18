@@ -143,9 +143,21 @@ Los logs de Vercel en `/api/mercadopago/oauth/start` incluyen `[mp-oauth] MERCAD
 
 Ver [`mercadopago-oauth-errores.md`](./mercadopago-oauth-errores.md). Nunca se exponen `access_token` / `refresh_token` al navegador.
 
+## Cobro QR (Checkout Pro) tras vincular
+
+| Requisito | Variable / panel |
+| --- | --- |
+| URL canónica para `notification_url` y `back_urls` | `NEXT_PUBLIC_SITE_URL` (p. ej. `https://www.pagolisto.com.ar`, sin redirect 301 desde apex) |
+| Webhook global o IPN | `MERCADOPAGO_WEBHOOK_SECRET` en Vercel; en MP Developers → Webhooks, URL `https://www…/api/mercadopago/webhook` |
+| Firma en IPN por preferencia | Las notificaciones de `notification_url` por cobro pueden llegar **sin** `data.id` en query: el código valida el pago vía API + `expected_total_ars` + intento. No activar `MERCADOPAGO_WEBHOOK_ALLOW_UNSIGNED` en producción salvo diagnóstico breve. |
+| Realtime POS | Migración `20260422133000_mp_cobro_intentos_realtime.sql`; la pestaña Cobrar hace **poll** cada 4s a `GET /api/mercadopago/cobro-intento/status` como respaldo. |
+| Intentos de cobro | Migración **`20260918120000_mp_cobro_intentos_preference_nullable.sql`**: el intento se persiste **antes** de crear la preferencia MP (`external_reference` estable). |
+
+Si el QR falla con “conexión expiró”, desvincular y volver a vincular (refresh token inválido). Si el pago se aprueba en MP pero no aparece la venta, revisar logs `[mercadopago:webhook]` (`amount_mismatch`, `intento_not_found`, `payment_not_found_for_any_token`).
+
 ## Migraciones Supabase
 
-Aplicar migraciones incl. **`20260915210000_mp_cobro_oauth_security.sql`** y **`20260916120000_mp_oauth_token_lockdown_harden.sql`** para revocar GRANT y eliminar políticas owner en `negocio_mercadopago_oauth`.
+Aplicar migraciones incl. **`20260915210000_mp_cobro_oauth_security.sql`**, **`20260916120000_mp_oauth_token_lockdown_harden.sql`** y **`20260918120000_mp_cobro_intentos_preference_nullable.sql`** para revocar GRANT en OAuth, intentos de cobro y columna `mp_preference_id` nullable durante el create.
 
 **Verificación post-migración** (SQL editor Supabase):
 

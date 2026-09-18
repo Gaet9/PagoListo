@@ -6,13 +6,13 @@ export function parsePositiveIntQuantity(
   fieldLabel: string,
 ): { ok: true; qty: number } | { ok: false; error: string } {
   if (typeof raw !== "number" || !Number.isFinite(raw)) {
-    return { ok: false, error: `${fieldLabel} must be a positive integer` };
+    return { ok: false, error: `${fieldLabel}: la cantidad debe ser un entero positivo` };
   }
   if (!Number.isInteger(raw) || raw <= 0) {
-    return { ok: false, error: `${fieldLabel} must be a positive integer` };
+    return { ok: false, error: `${fieldLabel}: la cantidad debe ser un entero positivo` };
   }
   if (raw > MAX_COBRO_LINE_QUANTITY) {
-    return { ok: false, error: `${fieldLabel} must be at most ${MAX_COBRO_LINE_QUANTITY}` };
+    return { ok: false, error: `${fieldLabel}: la cantidad máxima es ${MAX_COBRO_LINE_QUANTITY}` };
   }
   return { ok: true, qty: raw };
 }
@@ -26,14 +26,14 @@ export function buildCobroQuantityByProduct(
   rawItems: CobroLineQuantityInput[],
 ): { ok: true; qtyByProduct: Map<string, number> } | { ok: false; error: string; status: number } {
   if (!rawItems.length) {
-    return { ok: false, error: "Expected a non-empty items array", status: 400 };
+    return { ok: false, error: "El carrito debe tener al menos un producto", status: 400 };
   }
 
   const qtyByProduct = new Map<string, number>();
   for (const [i, item] of rawItems.entries()) {
     const productoId = item.id?.trim();
     if (!productoId) {
-      return { ok: false, error: `items[${i}].id is required`, status: 400 };
+      return { ok: false, error: `Falta el producto en la línea ${i + 1}`, status: 400 };
     }
     const parsed = parsePositiveIntQuantity(item.quantity, `items[${i}].quantity`);
     if (!parsed.ok) {
