@@ -145,6 +145,7 @@ function ProductoRowEditor({
     onOptimisticListo,
     onOptimisticListoFailed,
     onPersistSucceeded,
+    readOnly = false,
 }: {
     row: ProductoRow;
     onChanged: () => void;
@@ -155,6 +156,7 @@ function ProductoRowEditor({
     onOptimisticListo: (patch: ProductoEditablePatch) => void;
     onOptimisticListoFailed: () => void;
     onPersistSucceeded: () => void;
+    readOnly?: boolean;
 }) {
     const [nombre, setNombre] = useState(row.nombre);
     const [barcode, setBarcode] = useState(row.barcode ?? "");
@@ -319,7 +321,7 @@ function ProductoRowEditor({
         }
     };
 
-    const actions = (
+    const actions = readOnly ? null : (
         <>
             <Button
                 type='button'
@@ -555,11 +557,14 @@ function ProductoRowEditor({
     );
 }
 
-type Props = { negocioId: string };
+type Props = {
+    negocioId: string;
+    readOnly?: boolean;
+};
 
 const PAGE_SIZE = 10;
 
-export function ProductosTab({ negocioId }: Props) {
+export function ProductosTab({ negocioId, readOnly = false }: Props) {
     const [rows, setRows] = useState<ProductoRow[]>([]);
     const [totals, setTotals] = useState<ProductosTotals | null>(null);
     const [totalsError, setTotalsError] = useState<string | null>(null);
@@ -598,14 +603,15 @@ export function ProductosTab({ negocioId }: Props) {
         setNextCursor(null);
         const supabase = createClient();
         const search = debouncedSearch || undefined;
-        const [pageRes, totalsRes] = await Promise.all([
-            listProductosPage(supabase, negocioId, {
-                limit: PAGE_SIZE,
-                cursor: null,
-                search,
-            }),
-            fetchProductosTotalsForNegocio(supabase, negocioId, { search }),
-        ]);
+        const pageRes = await listProductosPage(supabase, negocioId, {
+            limit: PAGE_SIZE,
+            cursor: null,
+            search,
+        });
+        const totalsRes =
+            readOnly ?
+                { data: null, error: null }
+            :   await fetchProductosTotalsForNegocio(supabase, negocioId, { search });
         setLoadingInitial(false);
 
         const { data, error: e } = pageRes;
@@ -638,9 +644,10 @@ export function ProductosTab({ negocioId }: Props) {
         } else {
             setNextCursor(null);
         }
-    }, [debouncedSearch, negocioId]);
+    }, [debouncedSearch, negocioId, readOnly]);
 
     const refreshTotals = useCallback(async (opts?: { force?: boolean }) => {
+        if (readOnly) return;
         if (editingRowIdRef.current !== null && !opts?.force) return;
 
         const supabase = createClient();
@@ -653,7 +660,7 @@ export function ProductosTab({ negocioId }: Props) {
             setTotals(totalsRes.data);
             setTotalsError(null);
         }
-    }, [debouncedSearch, negocioId]);
+    }, [debouncedSearch, negocioId, readOnly]);
 
     type OptimisticListoSnapshot = { row: ProductoRow; totals: ProductosTotals | null };
     const optimisticSnapshotsRef = useRef<Map<string, OptimisticListoSnapshot>>(new Map());
@@ -842,6 +849,11 @@ export function ProductosTab({ negocioId }: Props) {
                 <p className='mt-1 text-sm text-muted-foreground'>El catálogo de tu negocio.</p>
             </div>
 
+            {readOnly ?
+                <p className='text-sm text-muted-foreground'>Solo lectura: consultá el catálogo para cobrar y registrar compras.</p>
+            :   null}
+
+            {!readOnly ?
             <div className='rounded-lg border bg-card'>
                 <Accordion type='single' collapsible value={addAccordionValue} onValueChange={setAddAccordionValue}>
                     <AccordionItem value='add-producto' className='border-b-0'>
@@ -928,8 +940,11 @@ export function ProductosTab({ negocioId }: Props) {
                     </AccordionItem>
                 </Accordion>
             </div>
+            :   null}
 
-            <BarcodeScannerDialog open={scannerOpen} onClose={() => setScannerOpen(false)} onDetected={(text) => setNBarcode(text)} />
+            {!readOnly ?
+                <BarcodeScannerDialog open={scannerOpen} onClose={() => setScannerOpen(false)} onDetected={(text) => setNBarcode(text)} />
+            :   null}
 
             <div className='grid gap-2'>
                 <Label htmlFor='productos-buscar'>Buscar productos</Label>
@@ -980,16 +995,20 @@ export function ProductosTab({ negocioId }: Props) {
                                 <th scope='col' className='p-2 font-medium'>
                                     Creado
                                 </th>
-                                <th scope='col' className='p-2 font-medium text-right'>
-                                    Acciones
-                                </th>
+                                {!readOnly ?
+                                    <th scope='col' className='p-2 font-medium text-right'>
+                                        Acciones
+                                    </th>
+                                :   null}
                             </tr>
                         </thead>
                         <tbody>
                             {rows.length === 0 ?
                                 <tr>
-                                    <td colSpan={8} className='p-6 text-center text-muted-foreground'>
-                                        No hay productos. Usa el formulario de arriba para añadir el primero.
+                                    <td colSpan={readOnly ? 7 : 8} className='p-6 text-center text-muted-foreground'>
+                                        {readOnly ?
+                                            "No hay productos activos."
+                                        :   "No hay productos. Usa el formulario de arriba para añadir el primero."}
                                     </td>
                                 </tr>
                             :   rows.map((row) => (
@@ -1007,6 +1026,7 @@ export function ProductosTab({ negocioId }: Props) {
                                             clearOptimisticListoSnapshot(row.id);
                                             void refreshTotals({ force: true });
                                         }}
+                                        readOnly={readOnly}
                                     />
                                 ))
                             }
@@ -1014,6 +1034,7 @@ export function ProductosTab({ negocioId }: Props) {
                     </table>
                 </div>
 
+                {!readOnly ?
                 <div role='region' aria-label='Totales de productos' className='shrink-0 border-t bg-muted/50'>
                     {totalsError ?
                         <p className='px-3 py-2 text-xs text-destructive'>{totalsError}</p>
@@ -1060,6 +1081,7 @@ export function ProductosTab({ negocioId }: Props) {
                         </div>
                     :   <div className='px-3 py-2 text-xs text-muted-foreground'>-</div>}
                 </div>
+                :   null}
             </div>
 
             <div ref={sentinelRef} className='h-1 w-full' aria-hidden />

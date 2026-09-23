@@ -4,6 +4,20 @@ import userEvent from "@testing-library/user-event";
 
 import { TiendaDashboard } from "@/components/tienda/tienda-dashboard";
 
+const { useNegocioRoleMock } = vi.hoisted(() => ({
+    useNegocioRoleMock: vi.fn(() => ({
+        loading: false,
+        error: null,
+        role: "owner" as const,
+        isManager: true,
+        isEmployee: false,
+    })),
+}));
+
+vi.mock("@/lib/hooks/use-negocio-role", () => ({
+    useNegocioRole: (...args: unknown[]) => useNegocioRoleMock(...args),
+}));
+
 // Avoid Supabase client creation in passive effects.
 vi.mock("@/lib/supabase/client", () => ({
     createClient: () => ({}),
@@ -52,6 +66,13 @@ describe("TiendaDashboard", () => {
     const originalFetch = globalThis.fetch;
 
     beforeEach(() => {
+        useNegocioRoleMock.mockReturnValue({
+            loading: false,
+            error: null,
+            role: "owner",
+            isManager: true,
+            isEmployee: false,
+        });
         const fetchMock = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
             const url =
                 typeof input === "string" ? input
@@ -126,6 +147,22 @@ describe("TiendaDashboard", () => {
         });
 
         expect(screen.getByRole("heading", { name: "Productos", hidden: true })).toBeInTheDocument();
+    });
+
+    it("oculta tabs de manager para empleados", () => {
+        useNegocioRoleMock.mockReturnValue({
+            loading: false,
+            error: null,
+            role: "employee",
+            isManager: false,
+            isEmployee: true,
+        });
+
+        render(<TiendaDashboard initialNegocios={[{ id: "n1", nombre: "Mi negocio", localizacion: null }]} />);
+
+        expect(screen.getByRole("button", { name: "Cobrar" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Configuración" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Movimientos de stock" })).not.toBeInTheDocument();
     });
 
     it("usa initialNegocioId cuando hay varios negocios", () => {

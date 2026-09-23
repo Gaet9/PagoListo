@@ -24,6 +24,8 @@ type Props = {
     refreshKey?: number;
     /** Notifica vinculación MP (p. ej. para habilitar cobro QR en Cobrar). */
     onConnectionChange?: (connected: boolean) => void;
+    /** Empleados: solo estado de conexión, sin vincular/desvincular ni enlace a configuración. */
+    allowOAuthManagement?: boolean;
 };
 
 export function MercadoPagoOAuthStatusBanner({
@@ -33,6 +35,7 @@ export function MercadoPagoOAuthStatusBanner({
     configuracionHref,
     refreshKey = 0,
     onConnectionChange,
+    allowOAuthManagement = true,
 }: Props) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -68,6 +71,7 @@ export function MercadoPagoOAuthStatusBanner({
     };
 
     const connected = !!status?.connected;
+    const configuracionLink = allowOAuthManagement ? configuracionHref : undefined;
 
     if (variant === "compact") {
         return (
@@ -87,32 +91,37 @@ export function MercadoPagoOAuthStatusBanner({
                         <Button type='button' size='sm' variant='outline' className='h-8' onClick={() => void load()}>
                             Reintentar
                         </Button>
-                        <Button type='button' size='sm' className='h-8' onClick={startConnect}>
-                            Vincular
-                        </Button>
+                        {allowOAuthManagement ?
+                            <Button type='button' size='sm' className='h-8' onClick={startConnect}>
+                                Vincular
+                            </Button>
+                        :   null}
                     </div>
                 : connected ?
                     <div className='space-y-2'>
                         <MercadoPagoCuentaDetalles status={status!} size='sm' />
-                        <MercadoPagoVinculacionCtas
-                            negocioId={negocioId}
-                            connected
-                            onConnect={startConnect}
-                            onUnlinked={() => void load()}
-                            size='sm'
-                        />
+                        {allowOAuthManagement ?
+                            <MercadoPagoVinculacionCtas
+                                negocioId={negocioId}
+                                connected
+                                onConnect={startConnect}
+                                onUnlinked={() => void load()}
+                                size='sm'
+                            />
+                        :   null}
                     </div>
-                :   <MercadoPagoVinculacionCtas
+                : allowOAuthManagement ?
+                    <MercadoPagoVinculacionCtas
                         negocioId={negocioId}
                         connected={false}
                         onConnect={startConnect}
                         onUnlinked={() => void load()}
                         size='sm'
                     />
-                }
-                {configuracionHref ?
+                :   <p className='text-xs text-muted-foreground'>Mercado Pago no está vinculado en esta tienda.</p>}
+                {configuracionLink ?
                     <p className='text-xs'>
-                        <Link href={configuracionHref} className='text-primary underline-offset-4 hover:underline'>
+                        <Link href={configuracionLink} className='text-primary underline-offset-4 hover:underline'>
                             Ver en Configuración de la tienda
                         </Link>
                     </p>
@@ -128,9 +137,9 @@ export function MercadoPagoOAuthStatusBanner({
                     <h3 id='mp-oauth-status-heading' className='text-sm font-medium'>Mercado Pago</h3>
                     {!loading && !error ? <MercadoPagoEstadoBadge connected={connected} /> : null}
                 </div>
-                {configuracionHref ?
+                {configuracionLink ?
                     <Link
-                        href={configuracionHref}
+                        href={configuracionLink}
                         className='text-xs text-primary underline-offset-4 hover:underline shrink-0'>
                         Más opciones en Configuración
                     </Link>
@@ -149,28 +158,33 @@ export function MercadoPagoOAuthStatusBanner({
                         <Button type='button' size='sm' variant='outline' onClick={() => void load()}>
                             Reintentar
                         </Button>
-                        <Button type='button' size='sm' onClick={startConnect}>
-                            Vincular
-                        </Button>
+                        {allowOAuthManagement ?
+                            <Button type='button' size='sm' onClick={startConnect}>
+                                Vincular
+                            </Button>
+                        :   null}
                     </div>
                 </div>
             : connected ?
                 <div className='space-y-3'>
                     <MercadoPagoCuentaDetalles status={status!} />
-                    <MercadoPagoVinculacionCtas
-                        negocioId={negocioId}
-                        connected
-                        onConnect={startConnect}
-                        onUnlinked={() => void load()}
-                    />
+                    {allowOAuthManagement ?
+                        <MercadoPagoVinculacionCtas
+                            negocioId={negocioId}
+                            connected
+                            onConnect={startConnect}
+                            onUnlinked={() => void load()}
+                        />
+                    :   null}
                 </div>
-            :   <MercadoPagoVinculacionCtas
+            : allowOAuthManagement ?
+                <MercadoPagoVinculacionCtas
                     negocioId={negocioId}
                     connected={false}
                     onConnect={startConnect}
                     onUnlinked={() => void load()}
                 />
-            }
+            :   <p className='text-sm text-muted-foreground'>Mercado Pago no está vinculado en esta tienda.</p>}
         </section>
     );
 }

@@ -13,7 +13,10 @@ import { toast } from "sonner";
 import { Camera, Minus, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Props = { negocioId: string };
+type Props = {
+    negocioId: string;
+    allowMpOAuthManagement?: boolean;
+};
 
 type CartItem = {
     producto: ProductoRow;
@@ -33,7 +36,7 @@ function toNumber(v: string | number | null | undefined) {
     return Number.isFinite(n) ? n : 0;
 }
 
-export function CobrarTab({ negocioId }: Props) {
+export function CobrarTab({ negocioId, allowMpOAuthManagement = true }: Props) {
     const [productos, setProductos] = useState<ProductoRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -205,6 +208,7 @@ export function CobrarTab({ negocioId }: Props) {
                 configuracionHref={configuracionHref}
                 variant='cobrar'
                 onConnectionChange={handleMpConnectionChange}
+                allowOAuthManagement={allowMpOAuthManagement}
             />
 
             <section className='rounded-lg border bg-card p-4 flex flex-col gap-3'>

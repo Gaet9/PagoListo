@@ -13,10 +13,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeftRight, Banknote, Package, Receipt, Settings, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useNegocioRole } from "@/lib/hooks/use-negocio-role";
+import {
+    canAccessTiendaTab,
+    isManagerOnlyTiendaTab,
+    type TiendaTabId,
+} from "@/lib/negocio/membership-role";
 
-type TabId = "cobrar" | "compras" | "productos" | "ventas" | "movimientos" | "configuracion";
-
-const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
+const tabs: { id: TiendaTabId; label: string; icon: LucideIcon }[] = [
     { id: "cobrar", label: "Cobrar", icon: Banknote },
     { id: "compras", label: "Compras", icon: ShoppingCart },
     { id: "productos", label: "Productos", icon: Package },
@@ -24,6 +28,8 @@ const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
     { id: "movimientos", label: "Movimientos de stock", icon: ArrowLeftRight },
     { id: "configuracion", label: "Configuración", icon: Settings },
 ];
+
+const EMPLOYEE_FALLBACK_TAB: TiendaTabId = "cobrar";
 
 type Props = {
     initialNegocios: NegocioListItem[];
@@ -33,9 +39,9 @@ type Props = {
 
 export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
     const [negocios, setNegocios] = useState<NegocioListItem[]>(initialNegocios);
-    const [tab, setTab] = useState<TabId>("productos");
+    const [tab, setTab] = useState<TiendaTabId>("productos");
     /** Evita desmontar pestañas ya visitadas: al volver no se pierde estado ni se muestra de nuevo el cargador completo. */
-    const [mountedTabs, setMountedTabs] = useState<ReadonlySet<TabId>>(() => new Set<TabId>(["productos"]));
+    const [mountedTabs, setMountedTabs] = useState<ReadonlySet<TiendaTabId>>(() => new Set<TiendaTabId>(["productos"]));
 
     const [negocioId, setNegocioId] = useState(() => {
         if (initialNegocioId && initialNegocios.some((n) => n.id === initialNegocioId)) {
@@ -53,19 +59,46 @@ export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
 
     const activeNegocio = useMemo(() => negocios.find((n) => n.id === currentNegocioId) ?? negocios[0], [negocios, currentNegocioId]);
 
+    const { isManager, loading: roleLoading } = useNegocioRole(currentNegocioId);
+
+    const visibleTabs = useMemo(
+        () => tabs.filter((t) => canAccessTiendaTab(t.id, isManager)),
+        [isManager],
+    );
+
     useEffect(() => {
         if (typeof window === "undefined") return;
         const params = new URLSearchParams(window.location.search);
         const raw = params.get("tab")?.trim().toLowerCase();
         if (!raw) return;
 
-        const allowed: TabId[] = ["cobrar", "compras", "productos", "ventas", "movimientos", "configuracion"];
-        const next = allowed.includes(raw as TabId) ? (raw as TabId) : null;
+        const next = tabs.some((t) => t.id === raw) ? (raw as TiendaTabId) : null;
         if (!next) return;
 
         setTab(next);
         setMountedTabs((prev) => new Set(prev).add(next));
     }, []);
+
+    useEffect(() => {
+        if (roleLoading) return;
+        if (canAccessTiendaTab(tab, isManager)) return;
+        const fallback = EMPLOYEE_FALLBACK_TAB;
+        setTab(fallback);
+        setMountedTabs((prev) => new Set(prev).add(fallback));
+    }, [isManager, roleLoading, tab]);
+
+    useEffect(() => {
+        if (roleLoading) return;
+        setMountedTabs((prev) => {
+            const next = new Set(prev);
+            for (const id of prev) {
+                if (isManagerOnlyTiendaTab(id) && !isManager) {
+                    next.delete(id);
+                }
+            }
+            return next;
+        });
+    }, [isManager, roleLoading]);
 
     if (negocios.length === 0) {
         return (
@@ -118,7 +151,7 @@ export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
                     "max-sm:sticky max-sm:top-0 max-sm:z-20 max-sm:-mx-1 max-sm:px-1 max-sm:pt-1 max-sm:pb-0.5",
                     "max-sm:bg-background/95 max-sm:backdrop-blur-sm supports-[backdrop-filter]:max-sm:bg-background/80",
                 )}>
-                {tabs.map((t) => {
+                {visibleTabs.map((t) => {
                     const Icon = t.icon;
                     return (
                         <button
@@ -148,7 +181,7 @@ export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
             <div className='min-h-dashboard-tab'>
                 {mountedTabs.has("cobrar") ?
                     <div key='panel-cobrar' hidden={tab !== "cobrar"}>
-                        <CobrarTab negocioId={currentNegocioId} />
+                        <CobrarTab negocioId={currentNegocioId} allowMpOAuthManagement={isManager} />
                     </div>
                 :   null}
                 {mountedTabs.has("compras") ?
@@ -158,20 +191,20 @@ export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
                 :   null}
                 {mountedTabs.has("productos") ?
                     <div key='panel-productos' hidden={tab !== "productos"}>
-                        <ProductosTab negocioId={currentNegocioId} />
+                        <ProductosTab negocioId={currentNegocioId} readOnly={!isManager} />
                     </div>
                 :   null}
                 {mountedTabs.has("ventas") ?
                     <div key='panel-ventas' hidden={tab !== "ventas"}>
-                        <VentasTab negocioId={currentNegocioId} />
+                        <VentasTab negocioId={currentNegocioId} showAggregatedStats={isManager} />
                     </div>
                 :   null}
-                {mountedTabs.has("movimientos") ?
+                {isManager && mountedTabs.has("movimientos") ?
                     <div key='panel-movimientos' hidden={tab !== "movimientos"}>
                         <MovimientosTab negocioId={currentNegocioId} />
                     </div>
                 :   null}
-                {mountedTabs.has("configuracion") ?
+                {isManager && mountedTabs.has("configuracion") ?
                     <div key='panel-configuracion' hidden={tab !== "configuracion"}>
                         <ConfiguracionTab negocioId={currentNegocioId} />
                     </div>
