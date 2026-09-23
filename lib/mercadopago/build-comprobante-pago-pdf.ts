@@ -15,9 +15,15 @@ export function comprobantePagoPdfRows(data: ComprobantePagoData): [string, stri
     ];
 }
 
+function lineHeightMm(doc: jsPDF, fontSizePt: number): number {
+    return (fontSizePt * doc.getLineHeightFactor()) / doc.internal.scaleFactor;
+}
+
 export function buildComprobantePagoPdfDocument(data: ComprobantePagoData): jsPDF {
     const doc = new jsPDF({ unit: "mm", format: "a4" });
     const margin = 18;
+    const pageW = doc.internal.pageSize.getWidth();
+    const contentW = pageW - margin * 2;
     let y = 22;
 
     doc.setFont("helvetica", "bold");
@@ -33,15 +39,20 @@ export function buildComprobantePagoPdfDocument(data: ComprobantePagoData): jsPD
     doc.setTextColor(0, 0, 0);
 
     const rows = comprobantePagoPdfRows(data);
+    const labelSize = 10;
+    const valueSize = 11;
 
-    doc.setFontSize(11);
     for (const [label, value] of rows) {
         doc.setFont("helvetica", "bold");
+        doc.setFontSize(labelSize);
         doc.text(label, margin, y);
+        y += lineHeightMm(doc, labelSize) + 1;
+
         doc.setFont("helvetica", "normal");
-        const wrapped = doc.splitTextToSize(value, 110);
-        doc.text(wrapped, margin + 52, y);
-        y += Math.max(7, wrapped.length * 5.2) + 2;
+        doc.setFontSize(valueSize);
+        const wrapped = doc.splitTextToSize(value, contentW);
+        doc.text(wrapped, margin, y);
+        y += wrapped.length * lineHeightMm(doc, valueSize) + 5;
     }
 
     return doc;

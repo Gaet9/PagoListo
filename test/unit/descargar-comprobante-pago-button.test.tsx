@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { DescargarComprobantePagoButton } from "@/components/mercadopago/descargar-comprobante-pago-button";
+import { comprobantePagoFromApi } from "@/lib/mercadopago/comprobante-pago-from-api";
 
 const fetchMock = vi.fn();
 vi.mock("@/lib/mercadopago/fetch-comprobante-pago-client", () => ({
@@ -18,6 +19,37 @@ describe("DescargarComprobantePagoButton", () => {
     beforeEach(() => {
         fetchMock.mockReset();
         downloadMock.mockReset();
+    });
+
+    it("pasa fecha al PDF aunque el API solo envíe fecha ISO", async () => {
+        const user = userEvent.setup();
+        fetchMock.mockResolvedValue({
+            ok: true,
+            comprobante: {
+                negocio_nombre: "Kiosco",
+                monto_ars: 500,
+                referencia_pago: "mp-1",
+                fecha: "2026-09-18T17:22:00.000Z",
+                fecha_display: "",
+            },
+        });
+
+        render(<DescargarComprobantePagoButton ventaId="v1" />);
+        await user.click(screen.getByRole("button", { name: /Descargar comprobante PDF/i }));
+
+        await waitFor(() => {
+            expect(downloadMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    fechaDisplay: comprobantePagoFromApi({
+                        negocio_nombre: "Kiosco",
+                        monto_ars: 500,
+                        referencia_pago: "mp-1",
+                        fecha: "2026-09-18T17:22:00.000Z",
+                        fecha_display: "",
+                    }).fechaDisplay,
+                }),
+            );
+        });
     });
 
     it("descarga PDF con datos del API", async () => {
