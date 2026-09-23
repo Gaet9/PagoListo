@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { cancelUserSubscription } from "@/lib/auth/cancel-user-subscription";
+import { denyUnlessSaasManager } from "@/lib/auth/negocio-manager-api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,6 +14,11 @@ export async function POST() {
 
   if (authError || !user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const saasDenied = await denyUnlessSaasManager(supabase, user.id);
+  if (saasDenied) {
+    return saasDenied;
   }
 
   const admin = createAdminClient();

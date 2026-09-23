@@ -119,16 +119,8 @@ export async function fetchUserSubscription(
 
 /** Paywall / middleware: nunca lanzar; ante error de verificación, tratar como sin abono activo. */
 export async function userHasActiveSubscription(supabase: SupabaseClient, userId: string): Promise<boolean> {
-  if (!isSubscriptionEnforcementEnabled()) {
-    return true;
-  }
-  try {
-    const { row, error } = await fetchUserSubscription(supabase, userId);
-    if (error) {
-      return false;
-    }
-    return isActiveSubscription(row);
-  } catch {
-    return false;
-  }
+  const { userHasEffectivePaidAccess } = await import(
+    "@/lib/auth/inherited-subscription-access"
+  );
+  return userHasEffectivePaidAccess(supabase, userId);
 }

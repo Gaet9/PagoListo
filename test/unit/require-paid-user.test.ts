@@ -12,10 +12,14 @@ function createSupabaseMock({
   hasClaims,
   subscription,
   subscriptionError,
+  inherited,
+  inheritError,
 }: {
   hasClaims: boolean;
   subscription?: { status: string; current_period_end: string | null; plan_code: string | null } | null;
   subscriptionError?: string | null;
+  inherited?: boolean;
+  inheritError?: string | null;
 }): SupabaseClient {
   return {
     auth: {
@@ -37,6 +41,10 @@ function createSupabaseMock({
           }),
         }),
       };
+    }),
+    rpc: vi.fn().mockResolvedValue({
+      data: inherited ?? false,
+      error: inheritError ? { message: inheritError } : null,
     }),
   } as unknown as SupabaseClient;
 }
@@ -67,6 +75,17 @@ describe("requirePaidUser", () => {
     });
     await requirePaidUser(supabase);
     expect(redirect).toHaveBeenCalledWith(`${SUBSCRIPTION_PAYWALL_PATH}?requiere_abono=1`);
+  });
+
+  it("returns user id when owner subscription is inherited via negocio", async () => {
+    const supabase = createSupabaseMock({
+      hasClaims: true,
+      subscription: { status: "inactive", current_period_end: null, plan_code: null },
+      inherited: true,
+    });
+    const res = await requirePaidUser(supabase);
+    expect(redirect).not.toHaveBeenCalled();
+    expect(res.userId).toBe("u1");
   });
 
   it("returns user id when subscription is active", async () => {
