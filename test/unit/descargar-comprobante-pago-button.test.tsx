@@ -11,7 +11,7 @@ vi.mock("@/lib/mercadopago/fetch-comprobante-pago-client", () => ({
 
 const downloadMock = vi.fn();
 vi.mock("@/lib/mercadopago/build-comprobante-pago-pdf", () => ({
-    downloadComprobantePagoPdf: (...args: unknown[]) => downloadMock(...args),
+    downloadComprobantePagoPdfFromApi: (...args: unknown[]) => downloadMock(...args),
 }));
 
 describe("DescargarComprobantePagoButton", () => {
@@ -40,10 +40,10 @@ describe("DescargarComprobantePagoButton", () => {
             expect(fetchMock).toHaveBeenCalledWith({ ventaId: "v1", intentoId: undefined, paymentId: undefined });
             expect(downloadMock).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    negocioNombre: "Kiosco",
-                    montoArs: 500,
-                    referenciaPago: "mp-1",
-                    fechaDisplay: "01/01/26 12:00",
+                    negocio_nombre: "Kiosco",
+                    monto_ars: 500,
+                    referencia_pago: "mp-1",
+                    fecha_display: "01/01/26 12:00",
                 }),
             );
         });
