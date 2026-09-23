@@ -532,5 +532,33 @@ describe("ProductosTab", () => {
     expect(totalsRegion).toHaveTextContent("$ 20,00");
     expect(within(region!).getByDisplayValue("20")).toBeInTheDocument();
   });
+
+  it("en solo lectura no muestra alta ni acciones", async () => {
+    listProductosPageMock.mockResolvedValue({
+      data: [
+        {
+          id: "p1",
+          negocio_id: "n1",
+          nombre: "Gaseosa",
+          barcode: null,
+          precio_compra: 10,
+          precio_venta: 20,
+          stock_actual: 5,
+          activo: true,
+          created_at: "2024-01-01T00:00:00Z",
+        },
+      ],
+      error: null,
+    });
+
+    render(<ProductosTab negocioId="n1" readOnly />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Gaseosa").length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByRole("button", { name: "Añadir producto" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Modificar" })).not.toBeInTheDocument();
+    expect(fetchProductosTotalsForNegocioMock).not.toHaveBeenCalled();
+  });
 });
 

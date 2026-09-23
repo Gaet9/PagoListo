@@ -22,6 +22,12 @@ import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/ui/page-shell";
 import { buildNegocioSlug } from "@/lib/negocio-slug";
 import { listNegocios } from "@/lib/queries/negocios";
+import { listNegocioMembershipsForUser } from "@/lib/queries/negocio-usuarios";
+import {
+  isNegocioManagerRole,
+  parseNegocioMembershipRole,
+  userHasAnyManagerMembership,
+} from "@/lib/negocio/membership-role";
 import { getUsuarioPerfil } from "@/lib/queries/usuarios";
 import { fetchUserSubscription, isSubscriptionEnforcementEnabled } from "@/lib/auth/user-subscription";
 import { createClient } from "@/lib/supabase/server";
@@ -34,11 +40,12 @@ async function PerfilContent() {
         redirect("/auth/login");
     }
 
-    const [{ data: usuario, error: usuarioErr }, { data: negocios, error: negErr }, subscriptionFetch] =
+    const [{ data: usuario, error: usuarioErr }, { data: negocios, error: negErr }, subscriptionFetch, membershipsRes] =
         await Promise.all([
         getUsuarioPerfil(supabase, auth.user.id),
         listNegocios(supabase),
         fetchUserSubscription(supabase, auth.user.id),
+        listNegocioMembershipsForUser(supabase, auth.user.id),
     ]);
     const subscriptionRow = subscriptionFetch.error ? null : subscriptionFetch.row;
 
@@ -52,6 +59,14 @@ async function PerfilContent() {
     }
 
     const negociosList = negocios ?? [];
+    const memberships = membershipsRes.data ?? [];
+    const canManageAccount =
+        negociosList.length === 0 || userHasAnyManagerMembership(memberships);
+    const managerNegocioIds = new Set(
+        memberships
+            .filter((m) => isNegocioManagerRole(parseNegocioMembershipRole(m.role)))
+            .map((m) => m.negocio_id),
+    );
 
     return (
         <div className='flex flex-col gap-8'>
@@ -90,29 +105,33 @@ async function PerfilContent() {
 
             <CambiarContrasenaPerfilCard email={usuario.email} />
 
-            <PageShell as='section' surface='card' padding='md' rounded='lg' className='space-y-3'>
-                <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                    <div className='min-w-0'>
-                        <h2>Suscripción</h2>
-                        <p className='text-sm text-muted-foreground mt-1'>Gestioná tu suscripción mensual para usar PagoListo.</p>
+            {canManageAccount ?
+                <PageShell as='section' surface='card' padding='md' rounded='lg' className='space-y-3'>
+                    <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                        <div className='min-w-0'>
+                            <h2>Suscripción</h2>
+                            <p className='text-sm text-muted-foreground mt-1'>Gestioná tu suscripción mensual para usar PagoListo.</p>
+                        </div>
+                        <Button asChild>
+                            <Link href='/perfil/subscripciones'>Ver suscripción</Link>
+                        </Button>
                     </div>
-                    <Button asChild>
-                        <Link href='/perfil/subscripciones'>Ver suscripción</Link>
-                    </Button>
-                </div>
-                {subscriptionFetch.error ?
-                    <p className="text-sm text-destructive">
-                        No se pudo cargar el estado de tu suscripción: {subscriptionFetch.error}
-                    </p>
-                :   <SuscripcionEstadoResumen row={subscriptionRow} enforcementEnabled={isSubscriptionEnforcementEnabled()} />}
-            </PageShell>
+                    {subscriptionFetch.error ?
+                        <p className="text-sm text-destructive">
+                            No se pudo cargar el estado de tu suscripción: {subscriptionFetch.error}
+                        </p>
+                    :   <SuscripcionEstadoResumen row={subscriptionRow} enforcementEnabled={isSubscriptionEnforcementEnabled()} />}
+                </PageShell>
+            :   null}
 
             <PageShell as='section' surface='card' padding='md' rounded='lg'>
                 <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
                     <h2>Negocios</h2>
                 </div>
                 <p className='text-sm text-muted-foreground mt-1'>Tus locales asociados a la cuenta. Podés crear más cuando quieras.</p>
-                <CrearTiendaEnPerfil />
+                {canManageAccount ?
+                    <CrearTiendaEnPerfil />
+                :   null}
                 {negErr ?
                     <p className='text-sm text-destructive'>{negErr.message}</p>
                 : negociosList.length === 0 ?
@@ -130,11 +149,14 @@ async function PerfilContent() {
                                         <NegocioMercadoPagoStatus
                                             negocioId={n.id}
                                             configuracionHref={`/tiendas/${slug}?tab=configuracion`}
+                                            allowOAuthManagement={managerNegocioIds.has(n.id)}
                                         />
                                     </div>
-                                    <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end shrink-0'>
-                                        <EliminarNegocioDialog negocioId={n.id} negocioNombre={n.nombre} />
-                                    </div>
+                                    {managerNegocioIds.has(n.id) ?
+                                        <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end shrink-0'>
+                                            <EliminarNegocioDialog negocioId={n.id} negocioNombre={n.nombre} />
+                                        </div>
+                                    :   null}
                                 </div>
                             );
                         })}
