@@ -11,6 +11,7 @@ import {
 } from "@/lib/mercadopago/oauth-start-debug";
 import { isMercadoPagoOAuthReconnectRequested } from "@/lib/mercadopago/oauth-reconnect";
 import { areEquivalentSiteOrigins, getConfiguredSiteOrigin } from "@/lib/mercadopago/oauth-site-host";
+import { denyUnlessNegocioManager } from "@/lib/auth/negocio-manager-api";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -71,6 +72,11 @@ export async function GET(request: NextRequest) {
     .single();
   if (negocioErr || !negocio) {
     return NextResponse.json({ error: "Negocio no encontrado o sin permisos" }, { status: 404 });
+  }
+
+  const managerDenied = await denyUnlessNegocioManager(supabase, negocioId);
+  if (managerDenied) {
+    return managerDenied;
   }
 
   if (reconnect) {

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { denyUnlessNegocioManager } from "@/lib/auth/negocio-manager-api";
 import { disconnectNegocioMercadoPagoOAuth } from "@/lib/mercadopago/disconnect-negocio-oauth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,6 +33,11 @@ export async function POST(request: NextRequest) {
   const { data: negocio, error: negocioErr } = await supabase.from("negocios").select("id").eq("id", negocioId).single();
   if (negocioErr || !negocio) {
     return NextResponse.json({ error: "Negocio no encontrado o sin permisos" }, { status: 404 });
+  }
+
+  const managerDenied = await denyUnlessNegocioManager(supabase, negocioId);
+  if (managerDenied) {
+    return managerDenied;
   }
 
   const result = await disconnectNegocioMercadoPagoOAuth(negocioId, { strictRevoke: true });

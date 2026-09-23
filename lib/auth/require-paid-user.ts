@@ -37,7 +37,17 @@ export async function requirePaidUser(supabase: SupabaseClient): Promise<Require
     return { userId, subscriptionLoadError: error };
   }
 
-  if (!isActiveSubscription(row)) {
+  if (isActiveSubscription(row)) {
+    return { userId };
+  }
+
+  const { data: inherited, error: inheritErr } = await supabase.rpc(
+    "has_active_subscription_via_negocio_owner",
+  );
+  if (inheritErr) {
+    return { userId, subscriptionLoadError: inheritErr.message };
+  }
+  if (inherited !== true) {
     redirect(`${SUBSCRIPTION_PAYWALL_PATH}?requiere_abono=1`);
   }
 

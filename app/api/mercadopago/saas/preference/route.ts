@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { createCheckoutProPreferenceSaas } from "@/lib/mercadopago/checkout-pro-preference";
 import { getMercadoPagoSaasAbonoWebhookUrl, resolveSaasAbonoPlan } from "@/lib/mercadopago/saas-abono-plan";
 import { getPublicSiteBaseUrl } from "@/lib/mercadopago/checkout-pro-urls";
+import { denyUnlessSaasManager } from "@/lib/auth/negocio-manager-api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -45,6 +46,11 @@ export async function POST(request: NextRequest) {
 
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const saasDenied = await denyUnlessSaasManager(supabase, user.id);
+  if (saasDenied) {
+    return saasDenied;
   }
 
   let plan;
