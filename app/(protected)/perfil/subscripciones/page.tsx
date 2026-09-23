@@ -16,6 +16,9 @@ import {
   resolveSubscriptionUiPhase,
 } from "@/lib/auth/user-subscription";
 import { resolveSaasAbonoPlan } from "@/lib/mercadopago/saas-abono-plan";
+import { userHasAnyManagerMembership } from "@/lib/negocio/membership-role";
+import { listNegocioMembershipsForUser } from "@/lib/queries/negocio-usuarios";
+import { listNegocios } from "@/lib/queries/negocios";
 import { createClient } from "@/lib/supabase/server";
 
 type PageProps = {
@@ -36,7 +39,16 @@ async function PerfilSubscripcionesContent({
     redirect("/auth/login");
   }
 
-  const { row, error: subscriptionError } = await fetchUserSubscription(supabase, auth.user.id);
+  const [{ row, error: subscriptionError }, { data: negocios }, membershipsRes] = await Promise.all([
+    fetchUserSubscription(supabase, auth.user.id),
+    listNegocios(supabase),
+    listNegocioMembershipsForUser(supabase, auth.user.id),
+  ]);
+  const canManageAccount =
+    (negocios?.length ?? 0) === 0 || userHasAnyManagerMembership(membershipsRes.data ?? []);
+  if (!canManageAccount) {
+    redirect("/perfil");
+  }
   const phase = resolveSubscriptionUiPhase(row);
   const enforcement = isSubscriptionEnforcementEnabled();
 

@@ -11,6 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { fetchMercadoPagoOAuthStatus } from "@/lib/mercadopago/fetch-oauth-status-client";
 import { buildMercadoPagoOAuthStartPath, resolveMercadoPagoOAuthReturnPath } from "@/lib/mercadopago/oauth-start-url";
 import { parseMpOAuthFlashFromSearchParams } from "@/lib/mercadopago/oauth-return";
+import { NegocioInvitarEmpleado } from "@/components/tienda/negocio-invitar-empleado";
 import type { MercadoPagoOAuthStatusResponse } from "@/lib/types/mercadopago-oauth-status";
 
 type Props = { negocioId: string };
@@ -101,6 +102,8 @@ export function ConfiguracionTab({ negocioId }: Props) {
                     </div>
                 :   null}
             </PageShell>
+
+            <NegocioInvitarEmpleado negocioId={negocioId} />
         </div>
     );
 }

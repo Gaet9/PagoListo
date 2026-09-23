@@ -25,9 +25,12 @@ const estadoLabel: Record<string, string> = {
     cancelled: "Cancelada",
 };
 
-type Props = { negocioId: string };
+type Props = {
+    negocioId: string;
+    showAggregatedStats?: boolean;
+};
 
-export function VentasTab({ negocioId }: Props) {
+export function VentasTab({ negocioId, showAggregatedStats = true }: Props) {
     const [rows, setRows] = useState<VentaRow[]>([]);
     const [nextCursor, setNextCursor] = useState<KeysetCursor | null>(null);
     const [hasMore, setHasMore] = useState(true);
@@ -137,7 +140,9 @@ export function VentasTab({ negocioId }: Props) {
                 <p className='text-sm text-destructive border border-destructive/30 rounded-md p-3'>{error}</p>
             :   null}
 
-            <VentasAreaChart negocioId={negocioId} />
+            {showAggregatedStats ?
+                <VentasAreaChart negocioId={negocioId} />
+            :   null}
 
             <div className='rounded-lg border overflow-hidden bg-card'>
                 {rows.length === 0 ?
