@@ -81,6 +81,7 @@ export async function resolveComprobantePagoForVenta(
             negocio_nombre: negocioNombre,
             monto_ars: monto,
             referencia_pago: referencia,
+            fecha: row.created_at,
         },
         error: null,
         status: 200,
@@ -93,6 +94,7 @@ type IntentoRow = {
     usuario_id: string;
     venta_id: string | null;
     created_at: string;
+    consumed_at: string | null;
     expected_total_ars: string | number | null;
 };
 
@@ -105,7 +107,7 @@ export async function resolveComprobantePagoForIntento(
 ): Promise<{ data: ComprobantePagoApiResponse | null; error: string | null; status: number }> {
     const { data: intento, error: intentoErr } = await admin
         .from("mp_cobro_intentos")
-        .select("id, negocio_id, usuario_id, venta_id, created_at, expected_total_ars")
+        .select("id, negocio_id, usuario_id, venta_id, created_at, consumed_at, expected_total_ars")
         .eq("id", intentoId)
         .maybeSingle();
 
@@ -150,11 +152,14 @@ export async function resolveComprobantePagoForIntento(
         };
     }
 
+    const fecha = row.consumed_at?.trim() || row.created_at;
+
     return {
         data: {
             negocio_nombre: negocioNombre,
             monto_ars: toNumber(row.expected_total_ars),
             referencia_pago: referencia,
+            fecha,
         },
         error: null,
         status: 200,

@@ -13,9 +13,13 @@ describe("comprobante-pago-format", () => {
         expect(formatted).toMatch(/\$/);
     });
 
-    it("formatea fecha en español AR", () => {
+    it("formatea fecha en español AR (Buenos Aires)", () => {
+        // 15:30 UTC = 12:30 en Argentina (sin DST en marzo)
         const text = formatComprobanteFechaAr("2026-03-15T15:30:00.000Z");
-        expect(text.length).toBeGreaterThan(8);
+        expect(text).toMatch(/15/);
+        expect(text).toMatch(/03/);
+        expect(text).toMatch(/2026/);
+        expect(text).toMatch(/12:30/);
     });
 
     it("sanitiza nombre de archivo PDF", () => {

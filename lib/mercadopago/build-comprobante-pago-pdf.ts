@@ -3,6 +3,7 @@ import { jsPDF } from "jspdf";
 import type { ComprobantePagoData } from "@/lib/mercadopago/comprobante-pago-types";
 import {
     comprobantePagoPdfSafeFilename,
+    formatComprobanteFechaAr,
     formatComprobanteMontoArs,
 } from "@/lib/mercadopago/comprobante-pago-format";
 
@@ -25,6 +26,7 @@ export function buildComprobantePagoPdfDocument(data: ComprobantePagoData): jsPD
 
     const rows: [string, string][] = [
         ["Negocio", data.negocioNombre],
+        ["Fecha", formatComprobanteFechaAr(data.fechaIso)],
         ["Importe", formatComprobanteMontoArs(data.montoArs)],
         ["Referencia de pago", data.referenciaPago],
     ];

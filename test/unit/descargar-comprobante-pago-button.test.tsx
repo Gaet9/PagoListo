@@ -28,6 +28,7 @@ describe("DescargarComprobantePagoButton", () => {
                 negocio_nombre: "Kiosco",
                 monto_ars: 500,
                 referencia_pago: "mp-1",
+                fecha: "2026-01-01T15:00:00.000Z",
             },
         });
 
@@ -41,6 +42,7 @@ describe("DescargarComprobantePagoButton", () => {
                     negocioNombre: "Kiosco",
                     montoArs: 500,
                     referenciaPago: "mp-1",
+                    fechaIso: "2026-01-01T15:00:00.000Z",
                 }),
             );
         });

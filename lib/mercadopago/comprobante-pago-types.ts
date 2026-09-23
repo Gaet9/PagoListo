@@ -1,11 +1,13 @@
 /**
- * Superficie del PDF (revisión seguridad): solo negocio, monto y referencia MP.
- * Sin tokens, PII del pagador ni UUIDs internos.
+ * Superficie del PDF: negocio, monto, referencia MP y fecha del cobro (no PII del pagador).
+ * Sin tokens ni UUIDs internos.
  */
 export type ComprobantePagoData = {
     negocioNombre: string;
     montoArs: number;
     referenciaPago: string;
+    /** Instantánea del cobro/venta (ISO, origen servidor). */
+    fechaIso: string;
 };
 
 /** Respuesta pública del API: mismos campos que el PDF. */
@@ -13,6 +15,8 @@ export type ComprobantePagoApiResponse = {
     negocio_nombre: string;
     monto_ars: number;
     referencia_pago: string;
+    /** Fecha/hora del cobro en ISO 8601 (UTC), desde venta o intento MP. */
+    fecha: string;
 };
 
 export function comprobantePagoFromApi(data: ComprobantePagoApiResponse): ComprobantePagoData {
@@ -20,5 +24,6 @@ export function comprobantePagoFromApi(data: ComprobantePagoApiResponse): Compro
         negocioNombre: data.negocio_nombre,
         montoArs: data.monto_ars,
         referenciaPago: data.referencia_pago,
+        fechaIso: data.fecha,
     };
 }
