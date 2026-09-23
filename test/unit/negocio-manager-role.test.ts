@@ -48,7 +48,7 @@ describe("userCanManageSaasSubscription", () => {
       if (table === "negocio_usuarios") {
         return {
           select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockImplementation((_col: string, _val: string) => ({
+            eq: vi.fn().mockImplementation(() => ({
               in: vi.fn().mockReturnValue({
                 limit: vi.fn().mockResolvedValue({ data: [], error: null }),
               }),
@@ -73,7 +73,7 @@ describe("userCanManageSaasSubscription", () => {
   });
 
   it("allows users without negocio (nueva cuenta)", async () => {
-    const from = vi.fn((table: string) => ({
+    const from = vi.fn(() => ({
       select: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
           in: vi.fn().mockReturnValue({
