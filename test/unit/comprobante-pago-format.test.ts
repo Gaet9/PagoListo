@@ -13,9 +13,9 @@ describe("comprobante-pago-format", () => {
         expect(formatted).toMatch(/\$/);
     });
 
-    it("formatea fecha en español AR", () => {
-        const text = formatComprobanteFechaAr("2026-03-15T15:30:00.000Z");
-        expect(text.length).toBeGreaterThan(8);
+    it("formatea fecha como ventas (dd/MM/yy HH:mm)", () => {
+        const text = formatComprobanteFechaAr("2026-09-18T17:22:00.000Z");
+        expect(text).toMatch(/^\d{2}\/\d{2}\/\d{2} \d{2}:\d{2}$/);
     });
 
     it("sanitiza nombre de archivo PDF", () => {

@@ -1,3 +1,5 @@
+import { formatVentaDateTimeAr } from "@/lib/utils/format-venta-datetime-ar";
+
 export function formatComprobanteMontoArs(monto: number): string {
     return new Intl.NumberFormat("es-AR", {
         style: "currency",
@@ -6,15 +8,9 @@ export function formatComprobanteMontoArs(monto: number): string {
     }).format(monto);
 }
 
+/** Misma presentación que la UI de Ventas para `created_at` de la venta. */
 export function formatComprobanteFechaAr(iso: string): string {
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) {
-        return iso;
-    }
-    return date.toLocaleString("es-AR", {
-        dateStyle: "long",
-        timeStyle: "short",
-    });
+    return formatVentaDateTimeAr(iso);
 }
 
 export function comprobantePagoPdfSafeFilename(referenciaPago: string): string {
