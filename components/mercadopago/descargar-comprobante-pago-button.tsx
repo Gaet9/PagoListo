@@ -4,8 +4,8 @@ import { FileDown } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { downloadComprobantePagoPdf } from "@/lib/mercadopago/build-comprobante-pago-pdf";
-import { comprobantePagoFromApi } from "@/lib/mercadopago/comprobante-pago-types";
+import { downloadComprobantePagoPdfFromApi } from "@/lib/mercadopago/build-comprobante-pago-pdf";
+import { ComprobanteSinFechaError } from "@/lib/mercadopago/comprobante-pago-types";
 import { fetchComprobantePago } from "@/lib/mercadopago/fetch-comprobante-pago-client";
 import { Button } from "@/components/ui/button";
 
@@ -49,7 +49,15 @@ export function DescargarComprobantePagoButton({
                             toast.error(result.message);
                             return;
                         }
-                        downloadComprobantePagoPdf(comprobantePagoFromApi(result.comprobante));
+                        try {
+                            downloadComprobantePagoPdfFromApi(result.comprobante);
+                        } catch (err) {
+                            if (err instanceof ComprobanteSinFechaError) {
+                                toast.error("Falta la fecha del cobro en el comprobante. Reintentá en unos segundos.");
+                                return;
+                            }
+                            throw err;
+                        }
                     } finally {
                         setBusy(false);
                     }

@@ -21,11 +21,8 @@ export type ComprobantePagoApiResponse = {
     fecha_display: string;
 };
 
-export function comprobantePagoFromApi(data: ComprobantePagoApiResponse): ComprobantePagoData {
-    return {
-        negocioNombre: data.negocio_nombre,
-        montoArs: data.monto_ars,
-        referenciaPago: data.referencia_pago,
-        fechaDisplay: data.fecha_display,
-    };
-}
+export {
+    comprobantePagoFromApi,
+    ComprobanteSinFechaError,
+    resolveComprobanteFechaDisplay,
+} from "@/lib/mercadopago/comprobante-pago-from-api";
