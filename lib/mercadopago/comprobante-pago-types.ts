@@ -6,8 +6,8 @@ export type ComprobantePagoData = {
     negocioNombre: string;
     montoArs: number;
     referenciaPago: string;
-    /** Instantánea del cobro/venta (ISO, origen servidor). */
-    fechaIso: string;
+    /** Texto listo para PDF (misma regla que Ventas). */
+    fechaDisplay: string;
 };
 
 /** Respuesta pública del API: mismos campos que el PDF. */
@@ -17,6 +17,8 @@ export type ComprobantePagoApiResponse = {
     referencia_pago: string;
     /** Fecha/hora del cobro en ISO 8601 (UTC), desde venta o intento MP. */
     fecha: string;
+    /** Fecha/hora legible (dd/MM/yy HH:mm), alineada con la UI de Ventas. */
+    fecha_display: string;
 };
 
 export function comprobantePagoFromApi(data: ComprobantePagoApiResponse): ComprobantePagoData {
@@ -24,6 +26,6 @@ export function comprobantePagoFromApi(data: ComprobantePagoApiResponse): Compro
         negocioNombre: data.negocio_nombre,
         montoArs: data.monto_ars,
         referenciaPago: data.referencia_pago,
-        fechaIso: data.fecha,
+        fechaDisplay: data.fecha_display,
     };
 }

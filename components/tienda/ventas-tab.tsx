@@ -10,6 +10,7 @@ import { VentasAreaChart } from "@/components/tienda/ventas-area-chart";
 import { DescargarComprobantePagoButton } from "@/components/mercadopago/descargar-comprobante-pago-button";
 import { VentaItemsPanel } from "@/components/tienda/venta-items-panel";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { formatVentaDateTimeAr } from "@/lib/utils/format-venta-datetime-ar";
 
 const PAGE_SIZE = 10;
 
@@ -143,16 +144,8 @@ export function VentasTab({ negocioId }: Props) {
                     <div className='p-6 text-center text-muted-foreground text-sm'>No hay ventas registradas.</div>
                 :   <Accordion type='single' collapsible>
                         {rows.map((v) => {
-                            const date = new Date(v.created_at);
-                            const fechaCorta = date.toLocaleDateString("es-AR", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "2-digit",
-                            });
-                            const hora = date.toLocaleTimeString("es-FR", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                            });
+                            const fechaHora = formatVentaDateTimeAr(v.created_at);
+                            const [fechaCorta, hora = ""] = fechaHora.split(" ");
                             const total = moneyARS(toNumber(v.total));
 
                             return (

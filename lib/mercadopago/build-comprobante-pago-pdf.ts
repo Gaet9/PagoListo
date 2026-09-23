@@ -3,9 +3,17 @@ import { jsPDF } from "jspdf";
 import type { ComprobantePagoData } from "@/lib/mercadopago/comprobante-pago-types";
 import {
     comprobantePagoPdfSafeFilename,
-    formatComprobanteFechaAr,
     formatComprobanteMontoArs,
 } from "@/lib/mercadopago/comprobante-pago-format";
+
+export function comprobantePagoPdfRows(data: ComprobantePagoData): [string, string][] {
+    return [
+        ["Negocio", data.negocioNombre],
+        ["Fecha", data.fechaDisplay],
+        ["Importe", formatComprobanteMontoArs(data.montoArs)],
+        ["Referencia de pago", data.referenciaPago],
+    ];
+}
 
 export function buildComprobantePagoPdfDocument(data: ComprobantePagoData): jsPDF {
     const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -24,12 +32,7 @@ export function buildComprobantePagoPdfDocument(data: ComprobantePagoData): jsPD
     y += 12;
     doc.setTextColor(0, 0, 0);
 
-    const rows: [string, string][] = [
-        ["Negocio", data.negocioNombre],
-        ["Fecha", formatComprobanteFechaAr(data.fechaIso)],
-        ["Importe", formatComprobanteMontoArs(data.montoArs)],
-        ["Referencia de pago", data.referenciaPago],
-    ];
+    const rows = comprobantePagoPdfRows(data);
 
     doc.setFontSize(11);
     for (const [label, value] of rows) {

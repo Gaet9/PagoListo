@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ComprobantePagoApiResponse } from "@/lib/mercadopago/comprobante-pago-types";
 import { resolveReferenciaPagoMercadoPago } from "@/lib/mercadopago/comprobante-pago-referencia";
+import { formatVentaDateTimeAr } from "@/lib/utils/format-venta-datetime-ar";
 
 type VentaMercadoPagoNested = {
     mp_payment_id: string | null;
@@ -76,12 +77,15 @@ export async function resolveComprobantePagoForVenta(
         };
     }
 
+    const fecha = row.created_at;
+
     return {
         data: {
             negocio_nombre: negocioNombre,
             monto_ars: monto,
             referencia_pago: referencia,
-            fecha: row.created_at,
+            fecha,
+            fecha_display: formatVentaDateTimeAr(fecha),
         },
         error: null,
         status: 200,
@@ -160,6 +164,7 @@ export async function resolveComprobantePagoForIntento(
             monto_ars: toNumber(row.expected_total_ars),
             referencia_pago: referencia,
             fecha,
+            fecha_display: formatVentaDateTimeAr(fecha),
         },
         error: null,
         status: 200,
