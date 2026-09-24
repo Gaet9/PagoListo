@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Loader2 } from "lucide-react";
 
 import { SuscripcionAbonoCheckout } from "@/components/perfil/suscripcion-abono-checkout";
 import { SuscripcionCancelButton } from "@/components/perfil/suscripcion-cancel-button";

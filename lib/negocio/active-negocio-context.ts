@@ -39,19 +39,6 @@ export function persistActiveNegocioIdClient(negocioId: string): void {
   document.cookie = `${ACTIVE_NEGOCIO_COOKIE_NAME}=${encodeURIComponent(negocioId.trim())}; Path=/; Max-Age=${ACTIVE_NEGOCIO_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax${secure}`;
 }
 
-/** Persiste el negocio activo en Server Components / rutas. */
-export async function persistActiveNegocioIdServer(negocioId: string): Promise<void> {
-  if (!negocioId.trim()) {
-    return;
-  }
-  const cookieStore = await cookies();
-  cookieStore.set(ACTIVE_NEGOCIO_COOKIE_NAME, negocioId.trim(), {
-    path: "/",
-    maxAge: ACTIVE_NEGOCIO_COOKIE_MAX_AGE_SECONDS,
-    sameSite: "lax",
-  });
-}
-
 export async function readActiveNegocioIdFromRequestCookies(): Promise<string | null> {
   const cookieStore = await cookies();
   return readActiveNegocioIdFromCookieValue(cookieStore.get(ACTIVE_NEGOCIO_COOKIE_NAME)?.value);
