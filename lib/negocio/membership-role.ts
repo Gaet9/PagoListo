@@ -17,6 +17,17 @@ export function isNegocioEmployeeRole(role: NegocioMembershipRole | null | undef
   return role === "employee";
 }
 
+export function negocioMembershipRoleLabel(role: NegocioMembershipRole): string {
+  switch (role) {
+    case "owner":
+      return "Dueño";
+    case "admin":
+      return "Administrador";
+    case "employee":
+      return "Empleado";
+  }
+}
+
 /** Tabs visibles solo para owner/admin del negocio activo. */
 export const MANAGER_ONLY_TIENDA_TABS = ["movimientos", "configuracion"] as const;
 

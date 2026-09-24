@@ -3,10 +3,25 @@ import { render, screen, waitFor } from "@testing-library/react";
 
 import { ConfiguracionTab } from "@/components/tienda/configuracion-tab";
 
+const { listNegocioMiembrosMock } = vi.hoisted(() => ({
+  listNegocioMiembrosMock: vi.fn(async () => ({ data: [], error: null })),
+}));
+
+vi.mock("@/lib/queries/negocio-usuarios", () => ({
+  listNegocioMiembros: (...args: unknown[]) => listNegocioMiembrosMock(...args),
+}));
+
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => ({}),
+}));
+
 describe("ConfiguracionTab", () => {
     const originalFetch = globalThis.fetch;
 
     beforeEach(() => {
+        listNegocioMiembrosMock.mockReset();
+        listNegocioMiembrosMock.mockResolvedValue({ data: [], error: null });
+
         globalThis.fetch = vi.fn(async (): Promise<Response> => {
             return new Response(
                 JSON.stringify({

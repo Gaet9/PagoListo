@@ -54,6 +54,9 @@ vi.mock("@/lib/queries/compras", () => ({
     listComprasByNegocioPage: async () => ({ data: [], error: null }),
     listCompraItemsByCompraId: async () => ({ data: [], error: null }),
 }));
+vi.mock("@/lib/queries/negocio-usuarios", () => ({
+    listNegocioMiembros: async () => ({ data: [], error: null }),
+}));
 vi.mock("@/lib/storage/compras-comprobantes", () => ({
     uploadCompraComprobante: async () => ({ storagePath: null, error: null }),
     getCompraComprobanteSignedUrl: async () => ({ signedUrl: "https://example.com/x", error: null }),

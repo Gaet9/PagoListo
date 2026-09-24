@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -8,14 +8,56 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageShell } from "@/components/ui/page-shell";
+import { Spinner } from "@/components/ui/spinner";
+import { negocioMembershipRoleLabel, parseNegocioMembershipRole } from "@/lib/negocio/membership-role";
+import { listNegocioMiembros } from "@/lib/queries/negocio-usuarios";
+import { createClient } from "@/lib/supabase/client";
+import type { NegocioMembershipRole, NegocioMiembroListItem } from "@/lib/types/negocio-membership";
 
 type Props = {
   negocioId: string;
 };
 
+function memberDisplayName(miembro: NegocioMiembroListItem, role: NegocioMembershipRole): string {
+  const perfil = miembro.usuarios;
+  if (perfil) {
+    const nombre = [perfil.nombre, perfil.apellido].filter(Boolean).join(" ").trim();
+    if (nombre) return nombre;
+    if (perfil.email) return perfil.email;
+  }
+  return negocioMembershipRoleLabel(role);
+}
+
 export function NegocioInvitarEmpleado({ negocioId }: Props) {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [membersError, setMembersError] = useState<string | null>(null);
+  const [miembros, setMiembros] = useState<NegocioMiembroListItem[]>([]);
+
+  const loadMiembros = useCallback(async () => {
+    if (!negocioId) {
+      setMiembros([]);
+      setLoadingMembers(false);
+      return;
+    }
+
+    setLoadingMembers(true);
+    setMembersError(null);
+    const supabase = createClient();
+    const { data, error } = await listNegocioMiembros(supabase, negocioId);
+    setLoadingMembers(false);
+    if (error) {
+      setMiembros([]);
+      setMembersError(error.message);
+      return;
+    }
+    setMiembros(data ?? []);
+  }, [negocioId]);
+
+  useEffect(() => {
+    void loadMiembros();
+  }, [loadMiembros]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +80,7 @@ export function NegocioInvitarEmpleado({ negocioId }: Props) {
       }
       toast.success("Empleado agregado");
       setEmail("");
+      await loadMiembros();
     } finally {
       setSubmitting(false);
     }
@@ -47,6 +90,42 @@ export function NegocioInvitarEmpleado({ negocioId }: Props) {
     <PageShell as="section" surface="card" padding="md" rounded="lg" maxWidth="content">
       <h3 className="text-sm font-medium">Equipo</h3>
       <p className="mt-1 text-sm text-muted-foreground">Agregá un empleado con su correo de cuenta.</p>
+
+      <div className="mt-4">
+        {loadingMembers ?
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner className="size-5 shrink-0" aria-hidden />
+            <span>Cargando equipo…</span>
+          </div>
+        : membersError ?
+          <div className="space-y-2">
+            <p className="text-sm text-destructive" role="alert">{membersError}</p>
+            <Button type="button" size="sm" variant="outline" onClick={() => void loadMiembros()}>
+              Reintentar
+            </Button>
+          </div>
+        : miembros.length === 0 ?
+          <p className="text-sm text-muted-foreground">Todavía no hay miembros en el equipo.</p>
+        :   <ul className="divide-y divide-border rounded-md border border-border">
+            {miembros.map((miembro) => {
+              const role = parseNegocioMembershipRole(miembro.role) ?? "employee";
+              const emailLabel = miembro.usuarios?.email;
+              return (
+                <li key={miembro.usuario_id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{memberDisplayName(miembro, role)}</p>
+                    {emailLabel ?
+                      <p className="text-muted-foreground truncate">{emailLabel}</p>
+                    : null}
+                  </div>
+                  <span className="shrink-0 text-muted-foreground">{negocioMembershipRoleLabel(role)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        }
+      </div>
+
       <form onSubmit={(e) => void onSubmit(e)} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="grid gap-1 flex-1 min-w-0">
           <Label htmlFor="invitar-email">Correo</Label>
