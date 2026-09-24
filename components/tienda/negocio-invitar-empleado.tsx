@@ -18,6 +18,10 @@ type Props = {
   negocioId: string;
 };
 
+function shortUsuarioId(usuarioId: string): string {
+  return usuarioId.replace(/-/g, "").slice(0, 8);
+}
+
 function memberDisplayName(miembro: NegocioMiembroListItem, role: NegocioMembershipRole): string {
   const perfil = miembro.usuarios;
   if (perfil) {
@@ -26,6 +30,13 @@ function memberDisplayName(miembro: NegocioMiembroListItem, role: NegocioMembers
     if (perfil.email) return perfil.email;
   }
   return negocioMembershipRoleLabel(role);
+}
+
+/** Subtítulo bajo el nombre: correo si RLS lo permite; si no, identificador visible del miembro. */
+function memberSecondaryLine(miembro: NegocioMiembroListItem): string {
+  const email = miembro.usuarios?.email?.trim();
+  if (email) return email;
+  return `Sin email · ${shortUsuarioId(miembro.usuario_id)}`;
 }
 
 export function NegocioInvitarEmpleado({ negocioId }: Props) {
@@ -109,14 +120,11 @@ export function NegocioInvitarEmpleado({ negocioId }: Props) {
         :   <ul className="divide-y divide-border rounded-md border border-border">
             {miembros.map((miembro) => {
               const role = parseNegocioMembershipRole(miembro.role) ?? "employee";
-              const emailLabel = miembro.usuarios?.email;
               return (
                 <li key={miembro.usuario_id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                   <div className="min-w-0">
                     <p className="font-medium truncate">{memberDisplayName(miembro, role)}</p>
-                    {emailLabel ?
-                      <p className="text-muted-foreground truncate">{emailLabel}</p>
-                    : null}
+                    <p className="text-muted-foreground truncate">{memberSecondaryLine(miembro)}</p>
                   </div>
                   <span className="shrink-0 text-muted-foreground">{negocioMembershipRoleLabel(role)}</span>
                 </li>

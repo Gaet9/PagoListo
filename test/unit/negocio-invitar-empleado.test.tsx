@@ -55,6 +55,30 @@ describe("NegocioInvitarEmpleado", () => {
     expect(screen.getByText("Dueño")).toBeInTheDocument();
   });
 
+  it("muestra dueño y empleado cuando el embed de usuarios viene null (RLS)", async () => {
+    listNegocioMiembrosMock.mockResolvedValue({
+      data: [
+        {
+          usuario_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+          role: "owner",
+          usuarios: { email: "owner@example.com", nombre: "Ana", apellido: "López" },
+        },
+        { usuario_id: "u-emp-1234-5678-90ab-cdef", role: "employee", usuarios: null },
+      ],
+      error: null,
+    });
+
+    render(<NegocioInvitarEmpleado negocioId="n1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Ana López")).toBeInTheDocument();
+    });
+    expect(screen.getByText("owner@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Dueño")).toBeInTheDocument();
+    expect(screen.getAllByText("Empleado")).toHaveLength(2);
+    expect(screen.getByText(/Sin email · uemp1234/i)).toBeInTheDocument();
+  });
+
   it("muestra filas sin join de usuarios y refetch tras invitar", async () => {
     listNegocioMiembrosMock
       .mockResolvedValueOnce({
@@ -90,7 +114,7 @@ describe("NegocioInvitarEmpleado", () => {
     await user.click(screen.getByRole("button", { name: /Agregar empleado/i }));
 
     await waitFor(() => {
-      expect(screen.getAllByText("Empleado").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(/Sin email · uemp/i)).toBeInTheDocument();
     });
     expect(listNegocioMiembrosMock).toHaveBeenCalledTimes(2);
   });
