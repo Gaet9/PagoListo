@@ -7,12 +7,18 @@ export type NegocioUsuarioRow = {
   role: NegocioMembershipRole;
 };
 
-export type NegocioMiembroListItem = {
+/** Fila de `negocio_usuarios` sin join (seguro bajo RLS del caller). */
+export type NegocioMiembroMembershipRow = {
   usuario_id: string;
   role: NegocioMembershipRole;
-  usuarios: {
-    email: string;
-    nombre: string;
-    apellido: string | null;
-  } | null;
+};
+
+export type NegocioMiembroUsuarioPerfil = {
+  email: string;
+  nombre: string;
+  apellido: string | null;
+};
+
+export type NegocioMiembroListItem = NegocioMiembroMembershipRow & {
+  usuarios: NegocioMiembroUsuarioPerfil | null;
 };

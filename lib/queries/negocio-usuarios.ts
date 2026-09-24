@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseNegocioMembershipRole } from "@/lib/negocio/membership-role";
 import type {
   NegocioMembershipRole,
-  NegocioMiembroListItem,
+  NegocioMiembroMembershipRow,
   NegocioUsuarioRow,
 } from "@/lib/types/negocio-membership";
 
@@ -38,10 +38,10 @@ export async function listNegocioMembershipsForUser(client: SupabaseClient, user
 export async function listNegocioMiembros(client: SupabaseClient, negocioId: string) {
   return client
     .from("negocio_usuarios")
-    .select("usuario_id, role, usuarios ( email, nombre, apellido )")
+    .select("usuario_id, role")
     .eq("negocio_id", negocioId)
     .order("role")
-    .returns<NegocioMiembroListItem[]>();
+    .returns<NegocioMiembroMembershipRow[]>();
 }
 
 export type InsertNegocioMiembroInput = {

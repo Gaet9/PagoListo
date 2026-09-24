@@ -10,9 +10,12 @@ import { Label } from "@/components/ui/label";
 import { PageShell } from "@/components/ui/page-shell";
 import { Spinner } from "@/components/ui/spinner";
 import { negocioMembershipRoleLabel, parseNegocioMembershipRole } from "@/lib/negocio/membership-role";
-import { listNegocioMiembros } from "@/lib/queries/negocio-usuarios";
-import { createClient } from "@/lib/supabase/client";
 import type { NegocioMembershipRole, NegocioMiembroListItem } from "@/lib/types/negocio-membership";
+
+function miembrosListUrl(negocioId: string): string {
+  const params = new URLSearchParams({ negocioId });
+  return `/api/negocios/miembros?${params.toString()}`;
+}
 
 type Props = {
   negocioId: string;
@@ -55,15 +58,24 @@ export function NegocioInvitarEmpleado({ negocioId }: Props) {
 
     setLoadingMembers(true);
     setMembersError(null);
-    const supabase = createClient();
-    const { data, error } = await listNegocioMiembros(supabase, negocioId);
-    setLoadingMembers(false);
-    if (error) {
+    try {
+      const res = await fetch(miembrosListUrl(negocioId));
+      const payload = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        miembros?: NegocioMiembroListItem[];
+      };
+      setLoadingMembers(false);
+      if (!res.ok) {
+        setMiembros([]);
+        setMembersError(payload.error ?? "No se pudo cargar el equipo");
+        return;
+      }
+      setMiembros(payload.miembros ?? []);
+    } catch {
+      setLoadingMembers(false);
       setMiembros([]);
-      setMembersError(error.message);
-      return;
+      setMembersError("No se pudo cargar el equipo");
     }
-    setMiembros(data ?? []);
   }, [negocioId]);
 
   useEffect(() => {

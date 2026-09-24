@@ -54,9 +54,6 @@ vi.mock("@/lib/queries/compras", () => ({
     listComprasByNegocioPage: async () => ({ data: [], error: null }),
     listCompraItemsByCompraId: async () => ({ data: [], error: null }),
 }));
-vi.mock("@/lib/queries/negocio-usuarios", () => ({
-    listNegocioMiembros: async () => ({ data: [], error: null }),
-}));
 vi.mock("@/lib/storage/compras-comprobantes", () => ({
     uploadCompraComprobante: async () => ({ storagePath: null, error: null }),
     getCompraComprobanteSignedUrl: async () => ({ signedUrl: "https://example.com/x", error: null }),
@@ -83,6 +80,9 @@ describe("TiendaDashboard", () => {
                 : input.url;
             if (url.includes("/api/mercadopago/oauth/status")) {
                 return new Response(JSON.stringify({ connected: false }), { status: 200, headers: { "Content-Type": "application/json" } });
+            }
+            if (url.includes("/api/negocios/miembros")) {
+                return new Response(JSON.stringify({ miembros: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
             }
             if (typeof originalFetch === "function") return originalFetch(input);
             return new Response("not found", { status: 404 });

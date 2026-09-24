@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { enrichNegocioMiembrosWithUsuarios } from "@/lib/negocio/enrich-negocio-miembros";
 import { isNegocioManagerRole, parseNegocioMembershipRole } from "@/lib/negocio/membership-role";
-import { insertNegocioMiembro } from "@/lib/queries/negocio-usuarios";
+import { insertNegocioMiembro, listNegocioMiembros } from "@/lib/queries/negocio-usuarios";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,6 +14,52 @@ type InviteBody = {
 
 function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
+}
+
+export async function GET(request: NextRequest) {
+  const negocioId = request.nextUrl.searchParams.get("negocioId")?.trim() ?? "";
+  if (!negocioId) {
+    return NextResponse.json({ error: "Falta negocioId" }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const { data: membership, error: membershipErr } = await supabase
+    .from("negocio_usuarios")
+    .select("role")
+    .eq("negocio_id", negocioId)
+    .eq("usuario_id", user.id)
+    .maybeSingle<{ role: string }>();
+
+  if (membershipErr) {
+    return NextResponse.json({ error: "No se pudo verificar permisos" }, { status: 500 });
+  }
+
+  const callerRole = parseNegocioMembershipRole(membership?.role);
+  if (!isNegocioManagerRole(callerRole)) {
+    return NextResponse.json({ error: "Sin permisos para ver el equipo de este negocio" }, { status: 403 });
+  }
+
+  const { data: rows, error: listErr } = await listNegocioMiembros(supabase, negocioId);
+  if (listErr) {
+    return NextResponse.json({ error: listErr.message }, { status: 500 });
+  }
+
+  const admin = createAdminClient();
+  const { miembros, error: enrichErr } = await enrichNegocioMiembrosWithUsuarios(admin, rows ?? []);
+  if (enrichErr) {
+    console.error("[negocios/miembros] enrich usuarios", enrichErr);
+    return NextResponse.json({ error: "No se pudo cargar perfiles del equipo" }, { status: 500 });
+  }
+
+  return NextResponse.json({ miembros });
 }
 
 export async function POST(request: NextRequest) {
