@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { isNegocioManagerRole, parseNegocioMembershipRole } from "@/lib/negocio/membership-role";
-import { insertNegocioMiembro } from "@/lib/queries/negocio-usuarios";
+import { parseNegocioMembershipRole } from "@/lib/negocio/membership-role";
+import { denyUnlessNegocioManager } from "@/lib/auth/negocio-manager-api";
+import { insertNegocioMiembro, listNegocioMiembros } from "@/lib/queries/negocio-usuarios";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,6 +14,34 @@ type InviteBody = {
 
 function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
+}
+
+export async function GET(request: NextRequest) {
+  const negocioId = new URL(request.url).searchParams.get("negocioId")?.trim() ?? "";
+  if (!negocioId) {
+    return NextResponse.json({ error: "Falta negocioId" }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const denied = await denyUnlessNegocioManager(supabase, negocioId);
+  if (denied) return denied;
+
+  const admin = createAdminClient();
+  const { data: miembros, error: listErr } = await listNegocioMiembros(admin, negocioId);
+  if (listErr) {
+    console.error("[negocios/miembros] list", listErr.message);
+    return NextResponse.json({ error: "No se pudo cargar el equipo" }, { status: 500 });
+  }
+
+  return NextResponse.json({ miembros: miembros ?? [] });
 }
 
 export async function POST(request: NextRequest) {
@@ -47,21 +76,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { data: membership, error: membershipErr } = await supabase
-    .from("negocio_usuarios")
-    .select("role")
-    .eq("negocio_id", negocioId)
-    .eq("usuario_id", user.id)
-    .maybeSingle<{ role: string }>();
-
-  if (membershipErr) {
-    return NextResponse.json({ error: "No se pudo verificar permisos" }, { status: 500 });
-  }
-
-  const callerRole = parseNegocioMembershipRole(membership?.role);
-  if (!isNegocioManagerRole(callerRole)) {
-    return NextResponse.json({ error: "Sin permisos para invitar en este negocio" }, { status: 403 });
-  }
+  const denied = await denyUnlessNegocioManager(supabase, negocioId);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const { data: targetUser, error: lookupErr } = await admin

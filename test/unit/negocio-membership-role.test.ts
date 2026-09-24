@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canAccessTiendaTab,
   isNegocioManagerRole,
+  negocioMembershipRoleLabel,
   parseNegocioMembershipRole,
   userHasAnyManagerMembership,
 } from "@/lib/negocio/membership-role";
@@ -32,5 +33,11 @@ describe("negocio membership role helpers", () => {
   it("detecta si el usuario tiene algún rol de manager", () => {
     expect(userHasAnyManagerMembership([{ role: "employee" }])).toBe(false);
     expect(userHasAnyManagerMembership([{ role: "employee" }, { role: "admin" }])).toBe(true);
+  });
+
+  it("etiquetas de rol en español", () => {
+    expect(negocioMembershipRoleLabel("owner")).toBe("Dueño");
+    expect(negocioMembershipRoleLabel("admin")).toBe("Administrador");
+    expect(negocioMembershipRoleLabel("employee")).toBe("Empleado");
   });
 });
