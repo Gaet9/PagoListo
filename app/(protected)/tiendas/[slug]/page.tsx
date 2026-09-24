@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { TiendaDashboard } from "@/components/tienda/tienda-dashboard";
 import { listNegocios } from "@/lib/queries/negocios";
+import { persistActiveNegocioIdServer } from "@/lib/negocio/active-negocio-context";
 import { resolveNegocioFromSlug } from "@/lib/negocio-slug";
 import type { NegocioListItem } from "@/lib/types/negocio";
 import { createClient } from "@/lib/supabase/server";
@@ -38,6 +39,8 @@ async function TiendaSlugContent({ params }: PageProps) {
   if (!match) {
     notFound();
   }
+
+  await persistActiveNegocioIdServer(match.id);
 
   if (negocios.length === 0) {
     redirect("/tiendas");
