@@ -4,7 +4,9 @@ import userEvent from "@testing-library/user-event";
 
 import { NegocioInvitarEmpleado } from "@/components/tienda/negocio-invitar-empleado";
 
-const listNegocioMiembrosMock = vi.fn();
+const { listNegocioMiembrosMock } = vi.hoisted(() => ({
+  listNegocioMiembrosMock: vi.fn(),
+}));
 
 vi.mock("@/lib/queries/negocio-usuarios", () => ({
   listNegocioMiembros: (...args: unknown[]) => listNegocioMiembrosMock(...args),
