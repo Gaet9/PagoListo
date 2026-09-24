@@ -20,9 +20,10 @@ import { Button } from "@/components/ui/button";
 type Props = {
   accessUntilLabel: string;
   disabled?: boolean;
+  negocioId?: string | null;
 };
 
-export function SuscripcionCancelButton({ accessUntilLabel, disabled }: Props) {
+export function SuscripcionCancelButton({ accessUntilLabel, disabled, negocioId }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +32,13 @@ export function SuscripcionCancelButton({ accessUntilLabel, disabled }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/subscription/cancel", { method: "POST" });
+      const payload =
+        negocioId?.trim() ? { negocioId: negocioId.trim() } : {};
+      const res = await fetch("/api/subscription/cancel", {
+        method: "POST",
+        headers: Object.keys(payload).length > 0 ? { "Content-Type": "application/json" } : undefined,
+        body: Object.keys(payload).length > 0 ? JSON.stringify(payload) : undefined,
+      });
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
         throw new Error(data?.error || "No se pudo cancelar la suscripción.");
@@ -42,7 +49,7 @@ export function SuscripcionCancelButton({ accessUntilLabel, disabled }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [negocioId, router]);
 
   return (
     <div className="space-y-2">

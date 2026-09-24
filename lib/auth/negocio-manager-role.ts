@@ -19,3 +19,34 @@ export async function userHasNegocioManagerRole(
   return data === true;
 }
 
+export async function userIsPropietarioOfNegocio(
+  supabase: SupabaseClient,
+  negocioId: string,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("negocios")
+    .select("id")
+    .eq("id", negocioId)
+    .eq("propietario_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    return false;
+  }
+  return data != null;
+}
+
+/**
+ * GAE-17: gestionar abono SaaS exige owner|admin en el negocio indicado (no «cualquier» manager).
+ */
+export async function userCanManageSaasForScopedNegocio(
+  supabase: SupabaseClient,
+  negocioId: string,
+  userId: string,
+): Promise<boolean> {
+  if (await userHasNegocioManagerRole(supabase, negocioId)) {
+    return true;
+  }
+  return userIsPropietarioOfNegocio(supabase, negocioId, userId);
+}

@@ -21,11 +21,17 @@ describe("SuscripcionCancelButton", () => {
 
   it("calls cancel API on confirm", async () => {
     const user = userEvent.setup();
-    render(<SuscripcionCancelButton accessUntilLabel="1 ene 2099" />);
+    render(<SuscripcionCancelButton accessUntilLabel="1 ene 2099" negocioId="negocio-b" />);
 
     await user.click(screen.getByRole("button", { name: /Cancelar suscripción/i }));
     await user.click(screen.getByRole("button", { name: /Confirmar cancelación/i }));
 
-    expect(fetch).toHaveBeenCalledWith("/api/subscription/cancel", { method: "POST" });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/subscription/cancel",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ negocioId: "negocio-b" }),
+      }),
+    );
   });
 });

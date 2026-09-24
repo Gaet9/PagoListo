@@ -20,4 +20,10 @@ describe("active negocio context module split", () => {
     expect(serverSource).toContain('import "server-only"');
     expect(serverSource).toContain("next/headers");
   });
+
+  it("saas abono access client module does not import server cookie reader", () => {
+    const clientSource = readFileSync(resolve(process.cwd(), "lib/auth/saas-abono-access.ts"), "utf8");
+    expect(clientSource).not.toMatch(/active-negocio-context\.server/);
+    expect(clientSource).not.toMatch(/next\/headers/);
+  });
 });

@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 
 type PostBody = {
   plan?: string;
+  negocioId?: string;
 };
 
 function parseBody(json: unknown): PostBody | null {
@@ -19,7 +20,11 @@ function parseBody(json: unknown): PostBody | null {
   if (!json || typeof json !== "object") return null;
   const o = json as Record<string, unknown>;
   if (o.plan !== undefined && typeof o.plan !== "string") return null;
-  return { plan: typeof o.plan === "string" ? o.plan : undefined };
+  if (o.negocioId !== undefined && typeof o.negocioId !== "string") return null;
+  return {
+    plan: typeof o.plan === "string" ? o.plan : undefined,
+    negocioId: typeof o.negocioId === "string" ? o.negocioId : undefined,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -48,7 +53,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const saasDenied = await denyUnlessSaasManager(supabase, user.id);
+  const saasDenied = await denyUnlessSaasManager(supabase, user.id, body.negocioId);
   if (saasDenied) {
     return saasDenied;
   }

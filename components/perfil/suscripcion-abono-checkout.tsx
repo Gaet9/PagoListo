@@ -14,9 +14,11 @@ const MercadoPagoWalletCheckout = dynamic(
 type Props = {
   amountLabel: string;
   disabled?: boolean;
+  /** Negocio en contexto (GAE-17); requerido en API si la cuenta tiene tiendas. */
+  negocioId?: string | null;
 };
 
-export function SuscripcionAbonoCheckout({ amountLabel, disabled }: Props) {
+export function SuscripcionAbonoCheckout({ amountLabel, disabled, negocioId }: Props) {
   const [preferenceId, setPreferenceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,10 +28,14 @@ export function SuscripcionAbonoCheckout({ amountLabel, disabled }: Props) {
     setError(null);
     setPreferenceId(null);
     try {
+      const payload: { plan: string; negocioId?: string } = { plan: "mensual" };
+      if (negocioId?.trim()) {
+        payload.negocioId = negocioId.trim();
+      }
       const res = await fetch("/api/mercadopago/saas/preference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: "mensual" }),
+        body: JSON.stringify(payload),
       });
       const data = (await res.json().catch(() => null)) as {
         error?: string;
@@ -53,7 +59,7 @@ export function SuscripcionAbonoCheckout({ amountLabel, disabled }: Props) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [negocioId]);
 
   return (
     <div className="space-y-4">
