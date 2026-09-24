@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { getSaasAbonoAccessForUser } from "@/lib/auth/saas-abono-access";
+import { getSaasAbonoAccessForUser } from "@/lib/auth/saas-abono-access.server";
 import { userHasNegocioManagerRole } from "@/lib/auth/negocio-manager-role";
 
 const FORBIDDEN_NEGOCIO_MANAGER =

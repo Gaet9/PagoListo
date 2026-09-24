@@ -1,9 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import {
-  readActiveNegocioIdFromRequestCookies,
-  resolveActiveNegocioId,
-} from "@/lib/negocio/active-negocio-context";
+import { resolveActiveNegocioId } from "@/lib/negocio/active-negocio-context";
 import {
   isNegocioEmployeeRole,
   isNegocioManagerRole,
@@ -12,7 +9,6 @@ import {
   getNegocioMembershipRoleForUser,
   resolveMembershipRoleFromQuery,
 } from "@/lib/queries/negocio-usuarios";
-import { listNegocios } from "@/lib/queries/negocios";
 import { userHasNegocioManagerRole } from "@/lib/auth/negocio-manager-role";
 
 export type SaasAbonoAccessContext = {
@@ -52,19 +48,4 @@ export async function userCanManageSaasAbonoInContext(
   }
 
   return userHasNegocioManagerRole(supabase, negocioId);
-}
-
-export async function getSaasAbonoAccessForUser(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<SaasAbonoAccessContext> {
-  const cookieNegocioId = await readActiveNegocioIdFromRequestCookies();
-  const { data: negocios } = await listNegocios(supabase);
-  const negocioIds = (negocios ?? []).map((n) => n.id);
-  const activeNegocioId = resolveActiveNegocioId(cookieNegocioId, negocioIds);
-  const canManage = await userCanManageSaasAbonoInContext(supabase, userId, {
-    negocioIds,
-    activeNegocioId,
-  });
-  return { canManage, activeNegocioId };
 }

@@ -29,7 +29,7 @@ import {
   userHasAnyManagerMembership,
 } from "@/lib/negocio/membership-role";
 import { getUsuarioPerfil } from "@/lib/queries/usuarios";
-import { getSaasAbonoAccessForUser } from "@/lib/auth/saas-abono-access";
+import { getSaasAbonoAccessForUser } from "@/lib/auth/saas-abono-access.server";
 import { fetchUserSubscription, isSubscriptionEnforcementEnabled } from "@/lib/auth/user-subscription";
 import { createClient } from "@/lib/supabase/server";
 import { Loader2 } from "lucide-react";

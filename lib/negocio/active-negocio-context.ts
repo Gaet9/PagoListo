@@ -1,5 +1,3 @@
-import { cookies } from "next/headers";
-
 /** Cookie que fija el negocio activo (selector en tienda / URL slug). */
 export const ACTIVE_NEGOCIO_COOKIE_NAME = "pagolisto_active_negocio_id";
 
@@ -37,9 +35,4 @@ export function persistActiveNegocioIdClient(negocioId: string): void {
   const secure =
     typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `${ACTIVE_NEGOCIO_COOKIE_NAME}=${encodeURIComponent(negocioId.trim())}; Path=/; Max-Age=${ACTIVE_NEGOCIO_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax${secure}`;
-}
-
-export async function readActiveNegocioIdFromRequestCookies(): Promise<string | null> {
-  const cookieStore = await cookies();
-  return readActiveNegocioIdFromCookieValue(cookieStore.get(ACTIVE_NEGOCIO_COOKIE_NAME)?.value);
 }

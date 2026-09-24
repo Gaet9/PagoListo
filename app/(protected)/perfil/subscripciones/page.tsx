@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Loader2 } from "lucide-react";
 
 import { SuscripcionAbonoCheckout } from "@/components/perfil/suscripcion-abono-checkout";
 import { SuscripcionCancelButton } from "@/components/perfil/suscripcion-cancel-button";
@@ -9,7 +10,7 @@ import {
   SuscripcionEstadoResumen,
 } from "@/components/perfil/suscripcion-estado-resumen";
 import { PageShell } from "@/components/ui/page-shell";
-import { getSaasAbonoAccessForUser } from "@/lib/auth/saas-abono-access";
+import { getSaasAbonoAccessForUser } from "@/lib/auth/saas-abono-access.server";
 import {
   fetchUserSubscription,
   isSubscriptionEnforcementEnabled,
@@ -22,7 +23,9 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function PerfilSubscripcionesPage({ searchParams }: PageProps) {
+async function PerfilSubscripcionesContent({
+  searchParams,
+}: PageProps) {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) {
@@ -65,40 +68,53 @@ export default async function PerfilSubscripcionesPage({ searchParams }: PagePro
         <p className="text-sm text-muted-foreground mt-1">Abono mensual de PagoListo vía Mercado Pago (Checkout Pro).</p>
       </div>
 
-      <Suspense fallback={null}>
-        <PageShell surface="card" padding="md" rounded="lg" className="space-y-4">
-          {requiereAbono && enforcement && phase !== "active" && phase !== "canceled_until_end" ? (
-            <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
-              Para usar <strong>PagoListo</strong> necesitás un abono activo. Completá el pago abajo o volvé cuando el
-              período esté vigente.
-            </div>
-          ) : null}
+      <PageShell surface="card" padding="md" rounded="lg" className="space-y-4">
+        {requiereAbono && enforcement && phase !== "active" && phase !== "canceled_until_end" ? (
+          <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+            Para usar <strong>PagoListo</strong> necesitás un abono activo. Completá el pago abajo o volvé cuando el
+            período esté vigente.
+          </div>
+        ) : null}
 
-          {subscriptionError ?
-            <p className="text-sm text-destructive">
-              No se pudo cargar el estado de tu suscripción: {subscriptionError}
-            </p>
-          :   <SuscripcionEstadoResumen row={row} enforcementEnabled={enforcement} />}
-
-          {planConfigError ?
-            <p className="text-sm text-destructive">{planConfigError}</p>
-          : null}
-
-          {subscriptionAllowsCheckout(row) ?
-            <SuscripcionAbonoCheckout amountLabel={amountLabel} disabled={!checkoutEnabled} />
-          : null}
-
-          {subscriptionAllowsCancel(row) ?
-            <SuscripcionCancelButton accessUntilLabel={accessUntilLabel} />
-          : null}
-
-          <p className="text-xs text-muted-foreground">
-            El abono es un pago mensual único vía Mercado Pago (Checkout Pro). En sandbox usá cuentas de prueba; en
-            producción configurá <code className="tutorial-code">MERCADOPAGO_ACCESS_TOKEN_SAAS</code> y el webhook en tu
-            URL pública (<code className="tutorial-code">/api/mercadopago/webhook</code>).
+        {subscriptionError ?
+          <p className="text-sm text-destructive">
+            No se pudo cargar el estado de tu suscripción: {subscriptionError}
           </p>
-        </PageShell>
-      </Suspense>
+        :   <SuscripcionEstadoResumen row={row} enforcementEnabled={enforcement} />}
+
+        {planConfigError ?
+          <p className="text-sm text-destructive">{planConfigError}</p>
+        : null}
+
+        {subscriptionAllowsCheckout(row) ?
+          <SuscripcionAbonoCheckout amountLabel={amountLabel} disabled={!checkoutEnabled} />
+        : null}
+
+        {subscriptionAllowsCancel(row) ?
+          <SuscripcionCancelButton accessUntilLabel={accessUntilLabel} />
+        : null}
+
+        <p className="text-xs text-muted-foreground">
+          El abono es un pago mensual único vía Mercado Pago (Checkout Pro). En sandbox usá cuentas de prueba; en
+          producción configurá <code className="tutorial-code">MERCADOPAGO_ACCESS_TOKEN_SAAS</code> y el webhook en tu
+          URL pública (<code className="tutorial-code">/api/mercadopago/webhook</code>).
+        </p>
+      </PageShell>
     </div>
+  );
+}
+
+export default function PerfilSubscripcionesPage({ searchParams }: PageProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center gap-2 text-muted-foreground py-12">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          Cargando…
+        </div>
+      }
+    >
+      <PerfilSubscripcionesContent searchParams={searchParams} />
+    </Suspense>
   );
 }
