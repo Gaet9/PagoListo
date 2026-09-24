@@ -3,6 +3,7 @@
 -- (PostgREST can drop parent rows when the embed is filtered by RLS).
 -- Least privilege: only users who share ≥1 negocio via negocio_usuarios.
 -- Keeps existing usuarios_select_own. Prod apply only after Gaétan GO.
+-- Function execute: authenticated + service_role only (revoke PUBLIC and anon).
 
 CREATE OR REPLACE FUNCTION public.shares_negocio_with(p_other_usuario_id uuid)
 RETURNS boolean
@@ -22,6 +23,7 @@ AS $function$
 $function$;
 
 REVOKE ALL ON FUNCTION public.shares_negocio_with(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.shares_negocio_with(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.shares_negocio_with(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.shares_negocio_with(uuid) TO service_role;
 
