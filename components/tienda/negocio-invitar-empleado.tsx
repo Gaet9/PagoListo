@@ -10,18 +10,22 @@ import { Label } from "@/components/ui/label";
 import { PageShell } from "@/components/ui/page-shell";
 import { Spinner } from "@/components/ui/spinner";
 import { negocioMembershipRoleLabel, parseNegocioMembershipRole } from "@/lib/negocio/membership-role";
-import type { NegocioMiembroListItem } from "@/lib/types/negocio-membership";
+import { listNegocioMiembros } from "@/lib/queries/negocio-usuarios";
+import { createClient } from "@/lib/supabase/client";
+import type { NegocioMembershipRole, NegocioMiembroListItem } from "@/lib/types/negocio-membership";
 
 type Props = {
   negocioId: string;
 };
 
-function memberDisplayName(miembro: NegocioMiembroListItem): string {
+function memberDisplayName(miembro: NegocioMiembroListItem, role: NegocioMembershipRole): string {
   const perfil = miembro.usuarios;
-  if (!perfil) return "Sin datos de perfil";
-  const nombre = [perfil.nombre, perfil.apellido].filter(Boolean).join(" ").trim();
-  if (nombre) return nombre;
-  return perfil.email;
+  if (perfil) {
+    const nombre = [perfil.nombre, perfil.apellido].filter(Boolean).join(" ").trim();
+    if (nombre) return nombre;
+    if (perfil.email) return perfil.email;
+  }
+  return negocioMembershipRoleLabel(role);
 }
 
 export function NegocioInvitarEmpleado({ negocioId }: Props) {
@@ -32,23 +36,23 @@ export function NegocioInvitarEmpleado({ negocioId }: Props) {
   const [miembros, setMiembros] = useState<NegocioMiembroListItem[]>([]);
 
   const loadMiembros = useCallback(async () => {
+    if (!negocioId) {
+      setMiembros([]);
+      setLoadingMembers(false);
+      return;
+    }
+
     setLoadingMembers(true);
     setMembersError(null);
-    try {
-      const res = await fetch(`/api/negocios/miembros?negocioId=${encodeURIComponent(negocioId)}`);
-      const payload = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        miembros?: NegocioMiembroListItem[];
-      };
-      if (!res.ok) {
-        setMiembros([]);
-        setMembersError(payload.error ?? "No se pudo cargar el equipo");
-        return;
-      }
-      setMiembros(Array.isArray(payload.miembros) ? payload.miembros : []);
-    } finally {
-      setLoadingMembers(false);
+    const supabase = createClient();
+    const { data, error } = await listNegocioMiembros(supabase, negocioId);
+    setLoadingMembers(false);
+    if (error) {
+      setMiembros([]);
+      setMembersError(error.message);
+      return;
     }
+    setMiembros(data ?? []);
   }, [negocioId]);
 
   useEffect(() => {
@@ -109,7 +113,7 @@ export function NegocioInvitarEmpleado({ negocioId }: Props) {
               return (
                 <li key={miembro.usuario_id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                   <div className="min-w-0">
-                    <p className="font-medium truncate">{memberDisplayName(miembro)}</p>
+                    <p className="font-medium truncate">{memberDisplayName(miembro, role)}</p>
                     {emailLabel ?
                       <p className="text-muted-foreground truncate">{emailLabel}</p>
                     : null}
