@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import {
-  userCanManageSaasSubscription,
-  userHasNegocioManagerRole,
-} from "@/lib/auth/negocio-manager-role";
+import { getSaasAbonoAccessForUser } from "@/lib/auth/saas-abono-access.server";
+import { userHasNegocioManagerRole } from "@/lib/auth/negocio-manager-role";
 
 const FORBIDDEN_NEGOCIO_MANAGER =
   "No tenés permisos para esta acción. Solo el dueño o un administrador del negocio puede hacerlo.";
@@ -26,7 +24,7 @@ export async function denyUnlessSaasManager(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<NextResponse | null> {
-  const canManage = await userCanManageSaasSubscription(supabase, userId);
+  const { canManage } = await getSaasAbonoAccessForUser(supabase, userId);
   if (!canManage) {
     return NextResponse.json({ error: FORBIDDEN_SAAS }, { status: 403 });
   }

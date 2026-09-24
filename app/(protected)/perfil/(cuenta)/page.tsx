@@ -29,6 +29,7 @@ import {
   userHasAnyManagerMembership,
 } from "@/lib/negocio/membership-role";
 import { getUsuarioPerfil } from "@/lib/queries/usuarios";
+import { getSaasAbonoAccessForUser } from "@/lib/auth/saas-abono-access.server";
 import { fetchUserSubscription, isSubscriptionEnforcementEnabled } from "@/lib/auth/user-subscription";
 import { createClient } from "@/lib/supabase/server";
 import { Loader2 } from "lucide-react";
@@ -60,6 +61,7 @@ async function PerfilContent() {
 
     const negociosList = negocios ?? [];
     const memberships = membershipsRes.data ?? [];
+    const { canManage: canManageSaasAbono } = await getSaasAbonoAccessForUser(supabase, auth.user.id);
     const canManageAccount =
         negociosList.length === 0 || userHasAnyManagerMembership(memberships);
     const managerNegocioIds = new Set(
@@ -105,7 +107,7 @@ async function PerfilContent() {
 
             <CambiarContrasenaPerfilCard email={usuario.email} />
 
-            {canManageAccount ?
+            {canManageSaasAbono ?
                 <PageShell as='section' surface='card' padding='md' rounded='lg' className='space-y-3'>
                     <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
                         <div className='min-w-0'>

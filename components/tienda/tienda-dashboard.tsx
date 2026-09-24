@@ -14,6 +14,7 @@ import type { LucideIcon } from "lucide-react";
 import { ArrowLeftRight, Banknote, Package, Receipt, Settings, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNegocioRole } from "@/lib/hooks/use-negocio-role";
+import { persistActiveNegocioIdClient } from "@/lib/negocio/active-negocio-context";
 import {
     canAccessTiendaTab,
     isManagerOnlyTiendaTab,
@@ -65,6 +66,11 @@ export function TiendaDashboard({ initialNegocios, initialNegocioId }: Props) {
         () => tabs.filter((t) => canAccessTiendaTab(t.id, isManager)),
         [isManager],
     );
+
+    useEffect(() => {
+        if (!currentNegocioId) return;
+        persistActiveNegocioIdClient(currentNegocioId);
+    }, [currentNegocioId]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
