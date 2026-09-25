@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { getSaasAbonoAccessForUser } from "@/lib/auth/saas-abono-access.server";
+import { isSaasAbonoManageAllowedForApi } from "@/lib/auth/saas-abono-access.server";
 import { userHasNegocioManagerRole } from "@/lib/auth/negocio-manager-role";
 
 const FORBIDDEN_NEGOCIO_MANAGER =
@@ -20,12 +20,16 @@ export async function denyUnlessNegocioManager(
   return null;
 }
 
+/**
+ * Abono SaaS (GAE-17): negocio activo vía cookie `pagolisto_active_negocio_id` y/o body `negocioId`.
+ */
 export async function denyUnlessSaasManager(
   supabase: SupabaseClient,
   userId: string,
+  negocioIdFromBody?: string | null,
 ): Promise<NextResponse | null> {
-  const { canManage } = await getSaasAbonoAccessForUser(supabase, userId);
-  if (!canManage) {
+  const allowed = await isSaasAbonoManageAllowedForApi(supabase, userId, negocioIdFromBody);
+  if (!allowed) {
     return NextResponse.json({ error: FORBIDDEN_SAAS }, { status: 403 });
   }
   return null;

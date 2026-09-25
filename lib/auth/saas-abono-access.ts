@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { userHasNegocioManagerRole } from "@/lib/auth/negocio-manager-role";
 import { resolveActiveNegocioId } from "@/lib/negocio/active-negocio-context";
 import {
   isNegocioEmployeeRole,
@@ -9,7 +10,6 @@ import {
   getNegocioMembershipRoleForUser,
   resolveMembershipRoleFromQuery,
 } from "@/lib/queries/negocio-usuarios";
-import { userHasNegocioManagerRole } from "@/lib/auth/negocio-manager-role";
 
 export type SaasAbonoAccessContext = {
   canManage: boolean;

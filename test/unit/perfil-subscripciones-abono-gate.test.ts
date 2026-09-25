@@ -9,11 +9,14 @@ describe("perfil subscripciones abono gate", () => {
       resolve(process.cwd(), "app/(protected)/perfil/subscripciones/page.tsx"),
       "utf8",
     );
-    const gateIndex = source.indexOf("getSaasAbonoAccessForUser");
-    const redirectIndex = source.indexOf('redirect("/perfil")');
-    const h1Index = source.indexOf("<h1>Suscripción</h1>");
+    const contentStart = source.indexOf("async function PerfilSubscripcionesContent");
+    expect(contentStart).toBeGreaterThan(-1);
+    expect(source).toContain("saas-abono-access.server");
+    const gateIndex = source.indexOf("getSaasAbonoAccessForUser", contentStart);
+    const redirectIndex = source.indexOf('redirect("/perfil")', contentStart);
+    const payUiIndex = source.indexOf("negocioId={activeNegocioId}", contentStart);
     expect(gateIndex).toBeGreaterThan(-1);
     expect(redirectIndex).toBeGreaterThan(gateIndex);
-    expect(h1Index).toBeGreaterThan(redirectIndex);
+    expect(payUiIndex).toBeGreaterThan(redirectIndex);
   });
 });

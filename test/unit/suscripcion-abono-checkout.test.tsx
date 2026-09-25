@@ -27,8 +27,8 @@ describe("SuscripcionAbonoCheckout", () => {
     expect(screen.getByRole("button", { name: /pagar abono/i })).toBeEnabled();
   });
 
-  it("starts checkout with server-side plan body", async () => {
-    render(<SuscripcionAbonoCheckout amountLabel="$ 4.999,00" />);
+  it("starts checkout with server-side plan body and scoped negocioId", async () => {
+    render(<SuscripcionAbonoCheckout amountLabel="$ 4.999,00" negocioId="negocio-b" />);
     fireEvent.click(screen.getByRole("button", { name: /pagar abono/i }));
 
     await waitFor(() => {
@@ -36,7 +36,7 @@ describe("SuscripcionAbonoCheckout", () => {
         "/api/mercadopago/saas/preference",
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ plan: "mensual" }),
+          body: JSON.stringify({ plan: "mensual", negocioId: "negocio-b" }),
         }),
       );
     });

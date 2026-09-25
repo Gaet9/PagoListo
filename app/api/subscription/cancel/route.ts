@@ -1,11 +1,29 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { cancelUserSubscription } from "@/lib/auth/cancel-user-subscription";
 import { denyUnlessSaasManager } from "@/lib/auth/negocio-manager-api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export async function POST() {
+function parseNegocioId(json: unknown): string | undefined {
+  if (!json || typeof json !== "object") {
+    return undefined;
+  }
+  const raw = (json as { negocioId?: unknown }).negocioId;
+  return typeof raw === "string" ? raw : undefined;
+}
+
+export async function POST(request: NextRequest) {
+  let negocioId: string | undefined;
+  try {
+    const text = await request.text();
+    if (text.trim()) {
+      negocioId = parseNegocioId(JSON.parse(text) as unknown);
+    }
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -16,7 +34,7 @@ export async function POST() {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const saasDenied = await denyUnlessSaasManager(supabase, user.id);
+  const saasDenied = await denyUnlessSaasManager(supabase, user.id, negocioId);
   if (saasDenied) {
     return saasDenied;
   }
