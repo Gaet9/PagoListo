@@ -59,8 +59,10 @@ describe("VentasAreaChart", () => {
 
         render(<VentasAreaChart negocioId='n1' />);
 
-        expect(screen.getByText("Ventas por día")).toBeInTheDocument();
-        expect(screen.getByLabelText("Seleccionar rango")).toBeInTheDocument();
+        expect(screen.getByText("Resumen de ventas")).toBeInTheDocument();
+        expect(screen.getByLabelText("Seleccionar período")).toBeInTheDocument();
+        expect(screen.getByText("Total")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Exportar CSV" })).toBeInTheDocument();
 
         await waitFor(() => {
             expect(listVentasTotalsForChartMock).toHaveBeenCalled();

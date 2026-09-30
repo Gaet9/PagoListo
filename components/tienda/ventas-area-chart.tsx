@@ -4,15 +4,19 @@ import * as React from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { createClient } from "@/lib/supabase/client";
-import { localCalendarDateYmd, parseLocalYmd } from "@/lib/local-calendar-date";
+import { parseLocalYmd } from "@/lib/local-calendar-date";
 import {
   listVentasTotalsForChart,
   type VentaTotalRow,
 } from "@/lib/queries/ventas";
 import {
+  resolveVentasReportRange,
+  summarizeVentasTotals,
+  type VentasReportPreset,
+} from "@/lib/ventas/report";
+import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -31,6 +35,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 type Props = {
@@ -38,7 +44,7 @@ type Props = {
 };
 
 type ChartPoint = {
-  date: string; // YYYY-MM-DD
+  date: string;
   total: number;
 };
 
@@ -49,28 +55,26 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-function startDateFromRange(reference: Date, timeRange: string) {
-  let daysToSubtract = 90;
-  if (timeRange === "30d") daysToSubtract = 30;
-  if (timeRange === "7d") daysToSubtract = 7;
-  const start = new Date(reference);
-  start.setDate(start.getDate() - daysToSubtract);
-  start.setHours(0, 0, 0, 0);
-  return start;
-}
-
-function toNumber(v: string | number | null | undefined) {
-  const n =
-    typeof v === "number" ? v : parseFloat(String(v ?? "").replace(",", "."));
-  return Number.isFinite(n) ? n : 0;
-}
-
 export function VentasAreaChart({ negocioId }: Props) {
-  const [timeRange, setTimeRange] = React.useState("30d");
+  const [preset, setPreset] = React.useState<VentasReportPreset>("semana");
+  const [customFrom, setCustomFrom] = React.useState("");
+  const [customTo, setCustomTo] = React.useState("");
   const [isSmallScreen, setIsSmallScreen] = React.useState(false);
   const [rows, setRows] = React.useState<VentaTotalRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [fetchError, setFetchError] = React.useState<string | null>(null);
+  const [exporting, setExporting] = React.useState(false);
+  const [exportError, setExportError] = React.useState<string | null>(null);
+
+  const range = React.useMemo(() => {
+    const resolved = resolveVentasReportRange({
+      preset,
+      customFromYmd: customFrom,
+      customToYmd: customTo,
+    });
+    if ("error" in resolved) return null;
+    return resolved;
+  }, [preset, customFrom, customTo]);
 
   React.useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
@@ -81,16 +85,20 @@ export function VentasAreaChart({ negocioId }: Props) {
   }, []);
 
   React.useEffect(() => {
+    if (!range) {
+      setLoading(false);
+      setRows([]);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       setLoading(true);
       setFetchError(null);
-      const end = new Date();
-      const start = startDateFromRange(end, timeRange);
       const supabase = createClient();
       const { data, error } = await listVentasTotalsForChart(supabase, negocioId, {
-        fromIso: start.toISOString(),
-        toIso: end.toISOString(),
+        fromIso: range.fromIso,
+        toIso: range.toIso,
       });
       if (cancelled) return;
       setLoading(false);
@@ -104,7 +112,7 @@ export function VentasAreaChart({ negocioId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [negocioId, timeRange]);
+  }, [negocioId, range]);
 
   const formatArs = React.useCallback(
     (value: number) => {
@@ -129,71 +137,159 @@ export function VentasAreaChart({ negocioId }: Props) {
     [isSmallScreen],
   );
 
-  const points = React.useMemo(() => {
-    const end = new Date();
-    end.setHours(0, 0, 0, 0);
-    const start = startDateFromRange(end, timeRange);
-
-    const byDay = new Map<string, number>();
-    for (const v of rows) {
-      const d = new Date(v.created_at);
-      d.setHours(0, 0, 0, 0);
-      if (d < start || d > end) continue;
-      const key = localCalendarDateYmd(d);
-      const n = toNumber(v.total);
-      byDay.set(key, (byDay.get(key) ?? 0) + n);
+  const summary = React.useMemo(() => {
+    if (!range) {
+      return { days: [], totalAmount: 0, ventaCount: 0 };
     }
+    return summarizeVentasTotals(rows, range.fromYmd, range.toYmd);
+  }, [rows, range]);
 
-    const out: ChartPoint[] = [];
-    const cursor = new Date(start);
-    cursor.setHours(0, 0, 0, 0);
-    while (cursor <= end) {
-      const key = localCalendarDateYmd(cursor);
-      out.push({ date: key, total: byDay.get(key) ?? 0 });
-      cursor.setDate(cursor.getDate() + 1);
+  const points = React.useMemo((): ChartPoint[] => {
+    return summary.days.map((d) => ({ date: d.date, total: d.total }));
+  }, [summary.days]);
+
+  const rangeInvalid = preset === "custom" && !range;
+
+  const handleExportCsv = async () => {
+    if (!range) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const params = new URLSearchParams({
+        negocioId,
+        preset,
+      });
+      if (preset === "custom") {
+        params.set("from", customFrom);
+        params.set("to", customTo);
+      }
+      const res = await fetch(
+        `/api/negocios/ventas-report/export?${params.toString()}`,
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        setExportError(body?.error ?? "No se pudo exportar");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ventas-${range.fromYmd}_${range.toYmd}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError("No se pudo exportar");
+    } finally {
+      setExporting(false);
     }
-    return out;
-  }, [rows, timeRange]);
+  };
 
   return (
     <Card className="pt-0">
-      <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
+      <CardHeader className="flex flex-col gap-3 border-b py-5 sm:flex-row sm:items-end">
         <div className="grid flex-1 gap-1">
-          <CardTitle>Ventas por día</CardTitle>
-          <CardDescription>
-            Total vendido en el rango (todas las ventas del negocio).
-          </CardDescription>
+          <CardTitle>Resumen de ventas</CardTitle>
         </div>
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger
-            className="w-[180px] rounded-lg sm:ml-auto"
-            aria-label="Seleccionar rango"
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:ml-auto">
+          <Select
+            value={preset}
+            onValueChange={(v) => setPreset(v as VentasReportPreset)}
           >
-            <SelectValue placeholder="Últimos 30 días" />
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            <SelectItem value="90d" className="rounded-lg">
-              Últimos 90 días
-            </SelectItem>
-            <SelectItem value="30d" className="rounded-lg">
-              Últimos 30 días
-            </SelectItem>
-            <SelectItem value="7d" className="rounded-lg">
-              Últimos 7 días
-            </SelectItem>
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              className="w-full rounded-lg sm:w-[180px]"
+              aria-label="Seleccionar período"
+            >
+              <SelectValue placeholder="Esta semana" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="hoy" className="rounded-lg">
+                Hoy
+              </SelectItem>
+              <SelectItem value="semana" className="rounded-lg">
+                Esta semana
+              </SelectItem>
+              <SelectItem value="custom" className="rounded-lg">
+                Personalizado
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loading || rangeInvalid || exporting}
+            onClick={() => void handleExportCsv()}
+          >
+            {exporting ?
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Exportando…
+              </>
+            :   "Exportar CSV"}
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent className="min-w-0 px-2 py-6 sm:px-6 sm:py-6">
-        {fetchError ? (
+      <CardContent className="min-w-0 px-2 py-4 sm:px-6 sm:py-5">
+        {preset === "custom" ?
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="flex flex-1 flex-col gap-1 text-sm">
+              <span className="text-muted-foreground">Desde</span>
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                aria-label="Fecha desde"
+              />
+            </label>
+            <label className="flex flex-1 flex-col gap-1 text-sm">
+              <span className="text-muted-foreground">Hasta</span>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                aria-label="Fecha hasta"
+              />
+            </label>
+          </div>
+        :   null}
+
+        {rangeInvalid ?
+          <p className="text-sm text-destructive mb-3">
+            Elegí un rango de fechas válido.
+          </p>
+        :   null}
+
+        {fetchError ?
           <p className="text-sm text-destructive mb-3">{fetchError}</p>
-        ) : null}
-        {loading ? (
+        :   null}
+        {exportError ?
+          <p className="text-sm text-destructive mb-3">{exportError}</p>
+        :   null}
+
+        {!rangeInvalid ?
+          <dl className="mb-4 grid grid-cols-2 gap-3 rounded-lg border bg-muted/40 p-3 sm:max-w-md">
+            <div>
+              <dt className="text-xs text-muted-foreground">Total</dt>
+              <dd className="text-lg font-semibold tabular-nums">
+                {loading ? "—" : formatArs(summary.totalAmount)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Ventas</dt>
+              <dd className="text-lg font-semibold tabular-nums">
+                {loading ? "—" : summary.ventaCount}
+              </dd>
+            </div>
+          </dl>
+        :   null}
+
+        {loading ?
           <div className="flex h-[250px] min-w-0 items-center justify-center gap-2 text-muted-foreground text-sm">
             <Loader2 className="h-5 w-5 animate-spin" />
-            Cargando gráfico…
+            Cargando…
           </div>
-        ) : (
+        : rangeInvalid ? null : (
           <ChartContainer
             config={chartConfig}
             className="h-[250px] w-full min-w-0"

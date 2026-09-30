@@ -75,6 +75,15 @@ describe("VentasTab", () => {
     expect(screen.getByText(/2 ×/)).toBeInTheDocument();
   });
 
+  it("oculta el resumen agregado cuando showAggregatedStats es false", async () => {
+    listVentasPageMock.mockResolvedValue({ data: [], error: null });
+
+    render(<VentasTab negocioId="n1" showAggregatedStats={false} />);
+
+    await screen.findByText("No hay ventas registradas.");
+    expect(screen.queryByText("Resumen de ventas")).not.toBeInTheDocument();
+  });
+
   it("muestra descarga de comprobante para ventas Mercado Pago", async () => {
     const user = userEvent.setup();
     listVentasPageMock.mockResolvedValue({
